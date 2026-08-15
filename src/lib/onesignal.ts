@@ -6,6 +6,7 @@ export const ONESIGNAL_APP_ID = '1815d233-b8ca-4472-8c01-cb1a5c415cb4'
 const VERIFICATION_SHOWN_KEY = 'onesignal_verification_shown'
 
 let initialized = false
+let initFailed = false
 let initPromise: Promise<void> | null = null
 
 /**
@@ -16,19 +17,24 @@ let initPromise: Promise<void> | null = null
  * subdirectory scope so the two workers do not collide.
  */
 export async function initOneSignal(): Promise<void> {
-  if (initialized) return
+  if (initialized || initFailed) return
   if (initPromise) return initPromise
 
   initPromise = (async () => {
-    await OneSignal.init({
-      appId: ONESIGNAL_APP_ID,
-      allowLocalhostAsSecureOrigin: import.meta.env.DEV,
-      serviceWorkerPath: 'push/onesignal/OneSignalSDKWorker.js',
-      serviceWorkerParam: { scope: '/push/onesignal/' },
-      notifyButton: { enable: false },
-    } as unknown as Parameters<typeof OneSignal.init>[0])
-
-    initialized = true
+    try {
+      await OneSignal.init({
+        appId: ONESIGNAL_APP_ID,
+        allowLocalhostAsSecureOrigin: import.meta.env.DEV,
+        serviceWorkerPath: 'push/onesignal/OneSignalSDKWorker.js',
+        serviceWorkerParam: { scope: '/push/onesignal/' },
+        notifyButton: { enable: false },
+      } as unknown as Parameters<typeof OneSignal.init>[0])
+      initialized = true
+    } catch (error) {
+      initFailed = true
+      // Never block the chat UI if OneSignal dashboard / site URL is misconfigured
+      console.warn('OneSignal init failed (chat still works):', error)
+    }
   })()
 
   return initPromise
@@ -46,6 +52,7 @@ export function markVerificationDialogShown(): void {
 export async function requestNotificationPermission(): Promise<boolean> {
   try {
     await initOneSignal()
+    if (initFailed || !initialized) return false
     const granted = await OneSignal.Notifications.requestPermission()
     return Boolean(granted)
   } catch (error) {
@@ -55,8 +62,13 @@ export async function requestNotificationPermission(): Promise<boolean> {
 }
 
 export function getPushSubscriptionId(): string | null {
-  const id = OneSignal.User.PushSubscription.id
-  return id ?? null
+  try {
+    if (!initialized) return null
+    const id = OneSignal.User.PushSubscription.id
+    return id ?? null
+  } catch {
+    return null
+  }
 }
 
 export function addPushSubscriptionChangeListener(
@@ -66,21 +78,42 @@ export function addPushSubscriptionChangeListener(
     listener(getPushSubscriptionId())
   }
 
-  OneSignal.User.PushSubscription.addEventListener('change', handler)
-  // Evaluate immediately — ID may already be assigned
-  handler()
-
-  return () => {
-    OneSignal.User.PushSubscription.removeEventListener('change', handler)
+  try {
+    if (!initialized) {
+      handler()
+      return () => undefined
+    }
+    OneSignal.User.PushSubscription.addEventListener('change', handler)
+    handler()
+    return () => {
+      try {
+        OneSignal.User.PushSubscription.removeEventListener('change', handler)
+      } catch {
+        /* ignore */
+      }
+    }
+  } catch {
+    handler()
+    return () => undefined
   }
 }
 
 export async function loginOneSignalUser(externalId: string): Promise<void> {
-  await initOneSignal()
-  await OneSignal.login(externalId)
+  try {
+    await initOneSignal()
+    if (initFailed || !initialized) return
+    await OneSignal.login(externalId)
+  } catch (error) {
+    console.warn('OneSignal login failed:', error)
+  }
 }
 
 export async function logoutOneSignalUser(): Promise<void> {
-  await initOneSignal()
-  await OneSignal.logout()
+  try {
+    await initOneSignal()
+    if (initFailed || !initialized) return
+    await OneSignal.logout()
+  } catch (error) {
+    console.warn('OneSignal logout failed:', error)
+  }
 }

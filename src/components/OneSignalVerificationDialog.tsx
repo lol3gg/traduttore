@@ -14,6 +14,7 @@ interface OneSignalVerificationDialogProps {
 /**
  * OneSignal Web verification dialog (required by SDK AI prompt).
  * Permission is requested only when the user taps "Got it".
+ * Init failures must never block the chat UI.
  */
 export function OneSignalVerificationDialog({
   onSubscribed,
@@ -28,16 +29,20 @@ export function OneSignalVerificationDialog({
     let cancelled = false
 
     async function boot() {
-      await initOneSignal()
-      if (cancelled) return
+      try {
+        await initOneSignal()
+        if (cancelled) return
 
-      removeListener = addPushSubscriptionChangeListener((id) => {
-        if (id) onSubscribedRef.current?.(id)
-      })
+        removeListener = addPushSubscriptionChangeListener((id) => {
+          if (id) onSubscribedRef.current?.(id)
+        })
 
-      if (!hasShownVerificationDialog() && !shownRef.current) {
-        shownRef.current = true
-        setOpen(true)
+        if (!hasShownVerificationDialog() && !shownRef.current) {
+          shownRef.current = true
+          setOpen(true)
+        }
+      } catch (error) {
+        console.warn('OneSignal verification boot failed:', error)
       }
     }
 
