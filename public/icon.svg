@@ -39,17 +39,14 @@
     </filter>
   </defs>
 
-  <!-- App tile -->
   <rect width="512" height="512" rx="118" fill="url(#bg)"/>
   <rect width="512" height="512" rx="118" fill="url(#auroraBlue)"/>
   <rect width="512" height="512" rx="118" fill="url(#auroraPink)"/>
   <rect x="1.5" y="1.5" width="509" height="509" rx="116.5" stroke="rgba(255,255,255,0.12)" stroke-width="3" fill="none"/>
 
-  <!-- Soft ambient orbs -->
   <circle cx="140" cy="130" r="90" fill="#3B82F6" opacity="0.18"/>
   <circle cx="390" cy="150" r="80" fill="#EC4899" opacity="0.16"/>
 
-  <!-- Back bubble (pink / RU) -->
   <g filter="url(#bubbleShadow)">
     <path
       fill="url(#pinkBubble)"
@@ -58,7 +55,6 @@
     <path fill="url(#sheen)" d="M176 118h188c36.5 0 66 29.5 66 66v20c-28-34-78-52-150-52H176c-18 0-34.5 5.2-48 14.2V184c0-36.5 29.5-66 66-66z" opacity="0.55"/>
   </g>
 
-  <!-- Front bubble (blue / IT) -->
   <g filter="url(#bubbleShadow)">
     <path
       fill="url(#blueBubble)"
@@ -67,14 +63,12 @@
     <path fill="url(#sheen)" d="M98 214h188c36.5 0 66 29.5 66 66v18c-26-32-72-50-140-50H98c-18.8 0-36 5.6-50 15.2V280c0-36.5 29.5-66 66-66z" opacity="0.5"/>
   </g>
 
-  <!-- Message dots -->
   <g fill="#FFFFFF">
     <circle cx="148" cy="292" r="14" opacity="0.95"/>
     <circle cx="192" cy="292" r="14" opacity="0.95"/>
     <circle cx="236" cy="292" r="14" opacity="0.95"/>
   </g>
 
-  <!-- Tiny translation spark between bubbles -->
   <g filter="url(#softGlow)" opacity="0.9">
     <circle cx="318" cy="248" r="18" fill="#FFFFFF" opacity="0.14"/>
     <path

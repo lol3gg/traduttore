@@ -84,9 +84,9 @@ export function ProfileSelector() {
               }}
             />
             <img
-              src="/icon-192.png"
+              src="/icon-512.png"
               alt=""
-              className="relative h-[5.75rem] w-[5.75rem] animate-icon-float rounded-[1.5rem] shadow-lift ring-1 ring-white/20"
+              className="relative h-[6.25rem] w-[6.25rem] animate-icon-float rounded-[1.65rem] shadow-lift ring-1 ring-white/25"
             />
           </div>
 

@@ -85,7 +85,7 @@ export function InstallAppButton({
         className="group flex w-full items-center gap-3.5 rounded-[1.5rem] border border-white/10 bg-white/[0.03] p-3.5 text-left transition hover:border-white/15 hover:bg-white/[0.05]"
       >
         <img
-          src="/icon-192.png"
+          src="/icon-512.png"
           alt=""
           className="h-12 w-12 rounded-[1.05rem] ring-1 ring-white/15"
         />
