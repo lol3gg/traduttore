@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { AlertCircle, RotateCcw, X } from 'lucide-react'
 import type { Message, Profile } from '../types'
 import { themeGradient } from '../lib/color'
+import { MessageTicks } from './MessageTicks'
 
 interface MessageBubbleProps {
   message: Message
@@ -59,6 +60,23 @@ export function MessageBubble({
   const gradient = !isFailed ? themeGradient(bubbleColor) : null
   const imageOnly = Boolean(imageSrc && !hasText)
 
+  const meta = (
+    <span
+      className={`inline-flex items-center gap-1 text-[10px] font-medium tabular-nums ${
+        isMine ? 'text-white/55' : 'text-slate-400'
+      } ${imageOnly ? 'rounded-full bg-black/45 px-1.5 py-0.5 backdrop-blur-sm' : ''}`}
+    >
+      <span>{formatTime(message.created_at)}</span>
+      {isMine && (
+        <MessageTicks
+          message={message}
+          lang={profile.lang}
+          onColoredBubble={!imageOnly && !isFailed}
+        />
+      )}
+    </span>
+  )
+
   return (
     <>
       <div
@@ -85,11 +103,13 @@ export function MessageBubble({
 
           <div
             className={`relative min-w-0 overflow-hidden ${
-              imageOnly ? 'rounded-[1.4rem] p-1' : 'rounded-[1.4rem] px-3.5 pb-5 pt-2.5'
+              imageOnly
+                ? 'rounded-[1.4rem] p-1'
+                : 'rounded-[1.4rem] px-3.5 pb-[1.35rem] pt-2.5'
             } ${
               isMine
                 ? `bubble-mine rounded-br-md text-white ${isFailed ? 'bg-red-950/90 ring-1 ring-red-500/40' : ''}`
-                : `bubble-peer rounded-bl-md text-slate-50 ${!imageOnly && !isFailed ? '' : ''}`
+                : 'bubble-peer rounded-bl-md text-slate-50'
             } ${isPending ? 'opacity-70' : ''}`}
             style={
               isMine && !isFailed && gradient && !imageOnly
@@ -141,12 +161,13 @@ export function MessageBubble({
                 Invio non riuscito
               </p>
             )}
+
             <span
-              className={`absolute bottom-1.5 right-3 text-[10px] font-medium tabular-nums ${
-                isMine ? 'text-white/55' : 'text-slate-400'
+              className={`absolute ${
+                imageOnly ? 'bottom-2.5 right-2.5' : 'bottom-1.5 right-3'
               }`}
             >
-              {formatTime(message.created_at)}
+              {meta}
             </span>
           </div>
         </div>
