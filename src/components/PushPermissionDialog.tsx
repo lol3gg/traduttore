@@ -11,9 +11,6 @@ interface PushPermissionDialogProps {
   onSubscribed?: (subscription: PushSubscriptionJSON) => void
 }
 
-/**
- * Asks once for notification permission and registers native Web Push.
- */
 export function PushPermissionDialog({ onSubscribed }: PushPermissionDialogProps) {
   const [open, setOpen] = useState(false)
   const shownRef = useRef(false)
@@ -26,8 +23,7 @@ export function PushPermissionDialog({ onSubscribed }: PushPermissionDialogProps
     if (Notification.permission === 'denied') return
 
     shownRef.current = true
-    // Small delay so the chat UI paints first
-    const timer = window.setTimeout(() => setOpen(true), 600)
+    const timer = window.setTimeout(() => setOpen(true), 700)
     return () => window.clearTimeout(timer)
   }, [])
 
@@ -47,15 +43,21 @@ export function PushPermissionDialog({ onSubscribed }: PushPermissionDialogProps
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4"
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm"
       role="dialog"
       aria-modal="true"
       aria-labelledby="push-enable-title"
     >
-      <div className="w-full max-w-sm rounded-3xl border border-white/10 bg-surface-elevated/95 p-6 shadow-soft backdrop-blur-xl">
+      <div className="glass-strong animate-fade-rise w-full max-w-sm rounded-[1.75rem] p-6">
+        <div
+          className="mb-4 h-1 w-14 rounded-full"
+          style={{
+            background: 'linear-gradient(90deg, #3B82F6, #EC4899)',
+          }}
+        />
         <h2
           id="push-enable-title"
-          className="font-display text-xl font-semibold tracking-tight text-white"
+          className="font-display text-xl font-bold tracking-tight text-white"
         >
           Attiva le notifiche
         </h2>
@@ -66,18 +68,18 @@ export function PushPermissionDialog({ onSubscribed }: PushPermissionDialogProps
           Su iPhone: aggiungi prima il sito alla Home Screen (iOS 16.4+), poi riapri l&apos;app
           dalla Home e attiva le notifiche.
         </p>
-        <div className="mt-5 flex flex-col gap-2">
+        <div className="mt-6 flex flex-col gap-2">
           <button
             type="button"
             onClick={() => void handleEnable()}
-            className="w-full rounded-full bg-gradient-to-r from-blue-500 to-sky-400 px-4 py-3 text-sm font-semibold text-white shadow-glow transition hover:brightness-110"
+            className="w-full rounded-[1.1rem] bg-gradient-to-r from-blue-500 to-sky-400 px-4 py-3.5 text-sm font-semibold text-white shadow-glow transition hover:brightness-110 active:scale-[0.99]"
           >
             Attiva
           </button>
           <button
             type="button"
             onClick={handleLater}
-            className="w-full rounded-full px-4 py-2.5 text-sm text-slate-400 transition hover:text-slate-200"
+            className="w-full rounded-[1.1rem] px-4 py-2.5 text-sm text-slate-400 transition hover:bg-white/[0.04] hover:text-slate-200"
           >
             Più tardi
           </button>

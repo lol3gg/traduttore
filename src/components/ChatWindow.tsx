@@ -36,13 +36,13 @@ function MessageSkeleton() {
   return (
     <div className="space-y-4 px-1 py-2" aria-hidden="true">
       <div className="flex justify-start">
-        <div className="h-12 w-[55%] animate-pulse rounded-[1.35rem] rounded-bl-md bg-white/5" />
+        <div className="h-12 w-[55%] animate-pulse rounded-[1.4rem] rounded-bl-md bg-white/[0.04]" />
       </div>
       <div className="flex justify-end">
-        <div className="h-10 w-[42%] animate-pulse rounded-[1.35rem] rounded-br-md bg-white/[0.07]" />
+        <div className="h-10 w-[42%] animate-pulse rounded-[1.4rem] rounded-br-md bg-white/[0.06]" />
       </div>
       <div className="flex justify-start">
-        <div className="h-14 w-[62%] animate-pulse rounded-[1.35rem] rounded-bl-md bg-white/5" />
+        <div className="h-14 w-[62%] animate-pulse rounded-[1.4rem] rounded-bl-md bg-white/[0.04]" />
       </div>
     </div>
   )
@@ -290,7 +290,7 @@ export function ChatWindow() {
   return (
     <div className="flex h-[100dvh] max-w-[100vw] flex-col overflow-hidden text-slate-100">
       <div className="chat-scroll relative min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain">
-        <header className="safe-top sticky top-0 z-10 flex items-center gap-2 border-b border-white/5 bg-[rgba(7,11,20,0.72)] px-3 py-2.5 pr-16 backdrop-blur-xl sm:gap-3 sm:px-4 sm:py-3 sm:pr-16">
+        <header className="header-shell safe-top sticky top-0 z-10 flex items-center gap-2.5 px-3 py-3 pr-16 sm:gap-3 sm:px-4 sm:pr-16">
           {otherProfile ? (
             <>
               <Avatar
@@ -300,7 +300,7 @@ export function ChatWindow() {
                 isOnline={otherOnline}
               />
               <div className="min-w-0 flex-1">
-                <p className="font-display truncate text-[15px] font-semibold tracking-tight text-slate-50">
+                <p className="font-display truncate text-[16px] font-bold tracking-tight text-white">
                   {otherProfile.name}
                 </p>
                 <OnlineStatus
@@ -320,16 +320,30 @@ export function ChatWindow() {
           )}
         </header>
 
-        <div className="space-y-3.5 px-3 py-4 pb-5 sm:px-4">
+        <div className="space-y-3.5 px-3 py-5 pb-6 sm:px-4">
           {loadingMessages ? (
             <MessageSkeleton />
           ) : messages.length === 0 ? (
-            <div className="flex flex-col items-center justify-center px-4 py-20 text-center">
-              <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-blue-500/20 to-pink-500/15 text-2xl text-slate-300 ring-1 ring-white/10">
-                ✦
+            <div className="flex flex-col items-center justify-center px-4 py-24 text-center">
+              <div className="relative mb-6">
+                <div
+                  className="absolute -inset-4 rounded-full opacity-60 blur-xl animate-soft-pulse"
+                  style={{
+                    background: `radial-gradient(circle, ${profile.theme_color}44, transparent 70%)`,
+                  }}
+                />
+                <div className="relative flex h-[4.5rem] w-[4.5rem] items-center justify-center rounded-[1.35rem] bg-white/[0.04] ring-1 ring-white/10">
+                  <span
+                    className="h-3 w-3 rounded-full"
+                    style={{
+                      background: `linear-gradient(135deg, ${profile.theme_color}, ${otherProfile?.theme_color ?? '#EC4899'})`,
+                      boxShadow: `0 0 18px ${profile.theme_color}88`,
+                    }}
+                  />
+                </div>
               </div>
-              <p className="font-display text-lg font-semibold text-slate-100">{t.emptyTitle}</p>
-              <p className="mt-1.5 max-w-xs text-sm leading-relaxed text-slate-500">
+              <p className="font-display text-xl font-bold text-white">{t.emptyTitle}</p>
+              <p className="mt-2 max-w-xs text-sm leading-relaxed text-slate-500">
                 {t.emptySubtitle}
               </p>
             </div>
@@ -349,20 +363,20 @@ export function ChatWindow() {
         </div>
       </div>
 
-      <div className="safe-bottom shrink-0 border-t border-white/5 bg-[rgba(7,11,20,0.85)] backdrop-blur-xl">
+      <div className="composer-shell safe-bottom shrink-0">
         {imagePreview && (
-          <div className="flex items-center gap-2 px-3 pt-3">
+          <div className="flex items-center gap-2 px-4 pt-3">
             <div className="relative">
               <img
                 src={imagePreview}
                 alt=""
-                className="h-16 w-16 rounded-2xl object-cover ring-1 ring-white/10"
+                className="h-16 w-16 rounded-2xl object-cover ring-1 ring-white/15"
               />
               <button
                 type="button"
                 onClick={clearImage}
                 aria-label={t.removePhoto}
-                className="absolute -right-1.5 -top-1.5 rounded-full bg-zinc-900 p-1 text-white ring-1 ring-white/10"
+                className="absolute -right-1.5 -top-1.5 rounded-full bg-[#0a0f1a] p-1 text-white ring-1 ring-white/15"
               >
                 <X className="h-3 w-3" />
               </button>
@@ -372,7 +386,7 @@ export function ChatWindow() {
 
         <form
           onSubmit={handleSubmit}
-          className="flex items-end gap-2 px-3 py-3 sm:px-4"
+          className="flex items-end gap-2 px-3 py-3.5 sm:px-4"
         >
           <input
             ref={fileInputRef}
@@ -387,7 +401,7 @@ export function ChatWindow() {
             type="button"
             onClick={() => fileInputRef.current?.click()}
             aria-label={t.addPhoto}
-            className="mb-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-slate-300 transition hover:bg-white/5 active:bg-white/10"
+            className="mb-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-slate-400 transition hover:bg-white/[0.06] hover:text-slate-200 active:scale-95"
           >
             <ImagePlus className="h-5 w-5" strokeWidth={1.75} />
           </button>
@@ -399,19 +413,22 @@ export function ChatWindow() {
             placeholder={t.placeholder}
             rows={1}
             enterKeyHint="send"
-            className="max-h-28 min-h-[46px] min-w-0 flex-1 resize-none rounded-[1.35rem] border border-white/10 bg-white/[0.04] px-4 py-3 text-base leading-snug text-slate-100 placeholder:text-slate-500 outline-none transition focus:border-sky-400/30 focus:bg-white/[0.06] sm:text-sm"
+            className="max-h-28 min-h-[46px] min-w-0 flex-1 resize-none rounded-[1.4rem] border border-white/10 bg-white/[0.045] px-4 py-3 text-base leading-snug text-slate-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] placeholder:text-slate-500 outline-none transition focus:border-white/20 focus:bg-white/[0.07] sm:text-sm"
           />
 
           <button
             type="submit"
             disabled={!canSend}
             aria-label="Invia"
-            className="mb-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-white shadow-soft transition active:scale-95 hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:brightness-100"
+            className="mb-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-white transition active:scale-95 hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:brightness-100"
             style={{
-              backgroundImage: `linear-gradient(145deg, ${profile.theme_color}, ${profile.theme_color}cc)`,
+              backgroundImage: `linear-gradient(145deg, ${profile.theme_color}, ${profile.theme_color}bb)`,
+              boxShadow: canSend
+                ? `0 10px 24px -10px ${profile.theme_color}aa, inset 0 1px 0 rgba(255,255,255,0.25)`
+                : undefined,
             }}
           >
-            <Send className="h-4 w-4" strokeWidth={2} />
+            <Send className="h-4 w-4" strokeWidth={2.25} />
           </button>
         </form>
       </div>

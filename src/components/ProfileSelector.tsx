@@ -47,7 +47,7 @@ export function ProfileSelector() {
     return (
       <div className="flex min-h-svh items-center justify-center">
         <div
-          className="h-9 w-9 animate-spin rounded-full border-2 border-border-subtle border-t-sky-300"
+          className="h-10 w-10 animate-spin rounded-full border-2 border-white/10 border-t-sky-300"
           aria-label="Caricamento"
         />
       </div>
@@ -57,12 +57,12 @@ export function ProfileSelector() {
   if (error) {
     return (
       <div className="flex min-h-svh items-center justify-center px-4">
-        <div className="glass-panel max-w-md space-y-3 rounded-3xl p-6 text-center shadow-soft">
+        <div className="glass-strong max-w-md space-y-3 rounded-[1.75rem] p-7 text-center">
           <p className="text-sm text-red-300">{error}</p>
           <button
             type="button"
             onClick={() => window.location.reload()}
-            className="text-sm text-slate-400 underline hover:text-slate-200"
+            className="text-sm text-slate-400 underline decoration-white/20 underline-offset-4 hover:text-slate-200"
           >
             Riprova
           </button>
@@ -72,56 +72,73 @@ export function ProfileSelector() {
   }
 
   return (
-    <div className="flex min-h-svh flex-col items-center justify-center px-4 py-10">
-      <div className="flex w-full max-w-md animate-fade-rise flex-col items-center gap-8">
-        <div className="flex flex-col items-center gap-4 text-center">
+    <div className="flex min-h-svh flex-col items-center justify-center px-5 py-12">
+      <div className="flex w-full max-w-md animate-fade-rise flex-col items-center gap-10">
+        <div className="flex flex-col items-center gap-5 text-center">
           <div className="relative">
-            <div className="absolute -inset-3 rounded-[1.75rem] bg-gradient-to-br from-blue-500/25 via-transparent to-pink-500/20 blur-xl" />
+            <div
+              className="absolute -inset-6 rounded-[2rem] opacity-70 blur-2xl animate-soft-pulse"
+              style={{
+                background:
+                  'radial-gradient(circle at 30% 30%, rgba(59,130,246,0.35), transparent 55%), radial-gradient(circle at 70% 70%, rgba(236,72,153,0.28), transparent 55%)',
+              }}
+            />
             <img
               src="/icon-192.png"
-              alt="Traduttore"
-              className="relative h-[5.5rem] w-[5.5rem] rounded-[1.35rem] shadow-glow ring-1 ring-white/15"
+              alt=""
+              className="relative h-[5.75rem] w-[5.75rem] animate-icon-float rounded-[1.5rem] shadow-lift ring-1 ring-white/20"
             />
           </div>
-          <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
-              Private chat
-            </p>
-            <h1 className="font-display mt-1.5 text-3xl font-semibold tracking-tight text-white">
+
+          <div className="space-y-2">
+            <h1 className="font-display brand-mark text-[2.75rem] font-extrabold leading-none tracking-tight sm:text-5xl">
               Traduttore
             </h1>
-            <p className="mt-2 text-sm text-slate-400">Italiano ↔ Russo · solo voi due</p>
+            <p className="text-[15px] font-medium tracking-wide text-slate-400">
+              Italiano ↔ Russo
+            </p>
+            <p className="text-sm text-slate-500">Chat privata · solo voi due</p>
           </div>
         </div>
 
-        <div className="grid w-full grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="grid w-full grid-cols-1 gap-3.5 sm:grid-cols-2">
           {profiles.map((p, index) => (
             <button
               key={p.id}
               type="button"
               onClick={() => handleSelect(p)}
-              style={{ animationDelay: `${120 + index * 80}ms` }}
-              className="group animate-fade-rise glass-panel flex flex-col items-center gap-3 rounded-3xl p-6 shadow-soft transition duration-300 hover:-translate-y-1 hover:shadow-glow focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-400/60"
-              onMouseEnter={(e) => {
-                e.currentTarget.style.boxShadow = `0 18px 40px -18px ${p.theme_color}88`
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.boxShadow = ''
-              }}
+              style={{ animationDelay: `${140 + index * 90}ms` }}
+              className="group animate-fade-rise relative flex flex-col items-center gap-3.5 overflow-hidden rounded-[1.75rem] px-5 py-7 text-center transition duration-300 hover:-translate-y-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-400/50"
             >
-              <Avatar name={p.name} themeColor={p.theme_color} size="lg" />
-              <span className="font-display text-lg font-semibold text-slate-50">{p.name}</span>
               <span
-                className="rounded-full px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wider text-white/90"
-                style={{ backgroundColor: `${p.theme_color}33`, color: p.theme_color }}
+                className="absolute inset-0 opacity-90 transition duration-300 group-hover:opacity-100"
+                style={{
+                  background: `linear-gradient(160deg, ${p.theme_color}22, rgba(255,255,255,0.04) 45%, rgba(0,0,0,0.2))`,
+                }}
+              />
+              <span className="absolute inset-0 rounded-[1.75rem] ring-1 ring-inset ring-white/10 transition group-hover:ring-white/20" />
+              <span
+                className="pointer-events-none absolute -right-6 -top-8 h-28 w-28 rounded-full opacity-40 blur-2xl transition duration-500 group-hover:opacity-70"
+                style={{ background: p.theme_color }}
+              />
+
+              <span className="relative">
+                <Avatar name={p.name} themeColor={p.theme_color} size="lg" />
+              </span>
+              <span className="relative font-display text-xl font-bold text-white">{p.name}</span>
+              <span
+                className="relative text-[11px] font-semibold uppercase tracking-[0.18em]"
+                style={{ color: p.theme_color }}
               >
-                {p.lang}
+                {p.lang === 'it' ? 'Italiano' : 'Русский'}
               </span>
             </button>
           ))}
         </div>
 
-        <p className="text-sm text-slate-500">Seleziona chi sei</p>
+        <p className="text-[13px] font-medium tracking-wide text-slate-500">
+          Tocca il tuo profilo per entrare
+        </p>
 
         <div className="w-full">
           <InstallAppButton variant="card" lang="it" />

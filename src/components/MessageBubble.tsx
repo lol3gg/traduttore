@@ -57,6 +57,7 @@ export function MessageBubble({
 
   const bubbleColor = isMine ? profile.theme_color : peerThemeColor
   const gradient = !isFailed ? themeGradient(bubbleColor) : null
+  const imageOnly = Boolean(imageSrc && !hasText)
 
   return (
     <>
@@ -66,7 +67,7 @@ export function MessageBubble({
         }`}
       >
         <div
-          className={`flex max-w-[88%] items-end gap-1.5 sm:max-w-[75%] ${
+          className={`flex max-w-[86%] items-end gap-1.5 sm:max-w-[72%] ${
             isMine ? 'flex-row' : 'flex-row-reverse'
           }`}
         >
@@ -83,30 +84,32 @@ export function MessageBubble({
           )}
 
           <div
-            className={`relative min-w-0 overflow-hidden shadow-bubble ${
-              imageSrc && !hasText
-                ? 'rounded-[1.35rem] p-1'
-                : 'rounded-[1.35rem] px-3.5 pb-5 pt-2.5'
+            className={`relative min-w-0 overflow-hidden ${
+              imageOnly ? 'rounded-[1.4rem] p-1' : 'rounded-[1.4rem] px-3.5 pb-5 pt-2.5'
             } ${
               isMine
-                ? `rounded-br-md text-white ${isFailed ? 'bg-red-950/90 ring-1 ring-red-500/40' : ''}`
-                : 'rounded-bl-md text-white'
+                ? `bubble-mine rounded-br-md text-white ${isFailed ? 'bg-red-950/90 ring-1 ring-red-500/40' : ''}`
+                : `bubble-peer rounded-bl-md text-slate-50 ${!imageOnly && !isFailed ? '' : ''}`
             } ${isPending ? 'opacity-70' : ''}`}
             style={
-              !isFailed && gradient && !(imageSrc && !hasText)
+              isMine && !isFailed && gradient && !imageOnly
                 ? {
                     backgroundImage: `linear-gradient(145deg, ${gradient.from}, ${gradient.to})`,
                   }
-                : !isFailed && imageSrc && !hasText
-                  ? { backgroundColor: 'transparent' }
-                  : undefined
+                : !isMine && !isFailed && !imageOnly
+                  ? {
+                      borderColor: `${peerThemeColor}33`,
+                    }
+                  : imageOnly && !isFailed
+                    ? { backgroundColor: 'transparent', border: 'none', boxShadow: 'none' }
+                    : undefined
             }
           >
             {imageSrc && (
               <button
                 type="button"
                 onClick={() => setLightbox(true)}
-                className="block w-full overflow-hidden rounded-[1.1rem] focus:outline-none"
+                className="block w-full overflow-hidden rounded-[1.15rem] focus:outline-none"
               >
                 <img
                   src={imageSrc}
@@ -119,16 +122,16 @@ export function MessageBubble({
 
             {hasText && (
               <p
-                className={`whitespace-pre-wrap break-words text-[15px] font-medium leading-relaxed tracking-[0.01em] ${
+                className={`whitespace-pre-wrap break-words text-[15px] font-medium leading-[1.45] tracking-[0.01em] ${
                   imageSrc ? 'mt-2' : ''
-                }`}
+                } ${isMine ? 'text-white' : 'text-slate-50'}`}
               >
                 {displayText}
               </p>
             )}
 
             {isTranslating && (
-              <p className="mt-1.5 text-[11px] font-medium italic text-white/65">
+              <p className="mt-1.5 bg-[linear-gradient(90deg,rgba(255,255,255,0.35),rgba(255,255,255,0.85),rgba(255,255,255,0.35))] bg-[length:200%_100%] bg-clip-text text-[11px] font-medium italic text-transparent animate-shimmer">
                 traduzione in corso…
               </p>
             )}
@@ -138,7 +141,11 @@ export function MessageBubble({
                 Invio non riuscito
               </p>
             )}
-            <span className="absolute bottom-1.5 right-3 text-[10px] font-medium tabular-nums text-white/60">
+            <span
+              className={`absolute bottom-1.5 right-3 text-[10px] font-medium tabular-nums ${
+                isMine ? 'text-white/55' : 'text-slate-400'
+              }`}
+            >
               {formatTime(message.created_at)}
             </span>
           </div>
@@ -147,7 +154,7 @@ export function MessageBubble({
 
       {lightbox && imageSrc && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/92 p-3 backdrop-blur-sm"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/92 p-3 backdrop-blur-md"
           onClick={() => setLightbox(false)}
           role="dialog"
           aria-modal="true"
@@ -155,7 +162,7 @@ export function MessageBubble({
           <button
             type="button"
             aria-label="Chiudi"
-            className="absolute right-3 top-3 rounded-full bg-white/10 p-2 text-white"
+            className="absolute right-3 top-3 rounded-full bg-white/10 p-2.5 text-white ring-1 ring-white/10 transition hover:bg-white/15"
             onClick={() => setLightbox(false)}
           >
             <X className="h-5 w-5" />
@@ -163,7 +170,7 @@ export function MessageBubble({
           <img
             src={imageSrc}
             alt=""
-            className="max-h-[90dvh] max-w-full rounded-2xl object-contain shadow-2xl"
+            className="max-h-[90dvh] max-w-full rounded-2xl object-contain shadow-lift"
             onClick={(e) => e.stopPropagation()}
           />
         </div>

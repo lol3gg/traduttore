@@ -12,7 +12,7 @@ function SwitchProfileButton() {
       onClick={() => setProfile(null)}
       title="Cambia profilo"
       aria-label="Cambia profilo"
-      className="safe-top absolute right-3 top-0 z-20 mt-3 rounded-full p-2 text-slate-400 transition hover:bg-white/5 hover:text-slate-100 sm:right-4"
+      className="safe-top absolute right-3 top-0 z-20 mt-3 rounded-full p-2.5 text-slate-500 transition hover:bg-white/[0.06] hover:text-slate-100 sm:right-4"
     >
       <svg
         xmlns="http://www.w3.org/2000/svg"
@@ -40,7 +40,7 @@ function AppContent() {
     return (
       <div className="flex min-h-svh items-center justify-center">
         <div
-          className="h-9 w-9 animate-spin rounded-full border-2 border-border-subtle border-t-sky-300"
+          className="h-10 w-10 animate-spin rounded-full border-2 border-white/10 border-t-sky-300"
           aria-label="Caricamento"
         />
       </div>
@@ -53,7 +53,7 @@ function AppContent() {
       {!profile ? (
         <ProfileSelector />
       ) : (
-        <div className="relative bg-background">
+        <div className="relative bg-transparent">
           <SwitchProfileButton />
           <ChatWindow />
         </div>

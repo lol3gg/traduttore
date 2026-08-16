@@ -30,10 +30,10 @@ export function adjustHex(hex: string, amount: number): string {
   return `#${((1 << 24) | (rr << 16) | (gg << 8) | bb).toString(16).slice(1)}`
 }
 
-/** Two gradient stops from a base theme color (±10%). */
+/** Two gradient stops from a base theme color. */
 export function themeGradient(hex: string): { from: string; to: string } {
   return {
-    from: adjustHex(hex, 0.1),
-    to: adjustHex(hex, -0.1),
+    from: adjustHex(hex, 0.16),
+    to: adjustHex(hex, -0.14),
   }
 }

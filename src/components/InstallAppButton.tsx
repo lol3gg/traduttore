@@ -52,7 +52,7 @@ export function InstallAppButton({
   if (installed) {
     if (variant === 'compact') return null
     return (
-      <div className="flex items-center justify-center gap-2 rounded-2xl border border-emerald-400/20 bg-emerald-400/10 px-4 py-3 text-sm font-medium text-emerald-300">
+      <div className="flex items-center justify-center gap-2 rounded-[1.25rem] border border-emerald-400/20 bg-emerald-400/[0.08] px-4 py-3 text-sm font-medium text-emerald-300">
         <Smartphone className="h-4 w-4" />
         {t.installed}
       </div>
@@ -74,7 +74,7 @@ export function InstallAppButton({
         onClick={() => void handlePrimary()}
         title={t.title}
         aria-label={t.title}
-        className="flex h-9 w-9 items-center justify-center rounded-full text-slate-300 transition hover:bg-border-subtle/50 hover:text-white"
+        className="flex h-9 w-9 items-center justify-center rounded-full text-slate-400 transition hover:bg-white/[0.06] hover:text-white"
       >
         <Download className="h-4 w-4" strokeWidth={2} />
       </button>
@@ -82,24 +82,24 @@ export function InstallAppButton({
       <button
         type="button"
         onClick={() => void handlePrimary()}
-        className="group flex w-full items-center gap-3 rounded-3xl border border-white/10 bg-white/[0.03] p-3.5 text-left shadow-soft backdrop-blur-md transition hover:border-white/15 hover:bg-white/[0.05]"
+        className="group flex w-full items-center gap-3.5 rounded-[1.5rem] border border-white/10 bg-white/[0.03] p-3.5 text-left transition hover:border-white/15 hover:bg-white/[0.05]"
       >
         <img
           src="/icon-192.png"
           alt=""
-          className="h-12 w-12 rounded-2xl shadow-md ring-1 ring-white/10"
+          className="h-12 w-12 rounded-[1.05rem] ring-1 ring-white/15"
         />
         <div className="min-w-0 flex-1">
-          <p className="font-display text-sm font-semibold text-slate-50">{t.title}</p>
+          <p className="font-display text-sm font-bold text-white">{t.title}</p>
           <p className="mt-0.5 text-xs leading-relaxed text-slate-400">{t.subtitle}</p>
         </div>
-        <Download className="h-5 w-5 shrink-0 text-sky-300 transition group-hover:scale-110" />
+        <Download className="h-5 w-5 shrink-0 text-sky-300/90 transition group-hover:translate-x-0.5" />
       </button>
     ) : (
       <button
         type="button"
         onClick={() => void handlePrimary()}
-        className="flex w-full items-center justify-center gap-2 rounded-full bg-gradient-to-r from-blue-500 to-pink-500 px-5 py-3.5 text-sm font-semibold text-white shadow-glow transition hover:brightness-110 active:scale-[0.98]"
+        className="flex w-full items-center justify-center gap-2 rounded-[1.15rem] bg-gradient-to-r from-blue-500 to-pink-500 px-5 py-3.5 text-sm font-semibold text-white shadow-glow transition hover:brightness-110 active:scale-[0.98]"
       >
         <Download className="h-4 w-4" />
         {t.button}
@@ -117,24 +117,24 @@ export function InstallAppButton({
           aria-modal="true"
           aria-labelledby="install-app-title"
         >
-          <div className="w-full max-w-sm overflow-hidden rounded-3xl border border-border-subtle bg-surface shadow-2xl">
-            <div className="relative flex flex-col items-center bg-gradient-to-b from-slate-800/80 to-surface px-5 pb-4 pt-6">
+          <div className="w-full max-w-sm overflow-hidden rounded-[1.75rem] border border-white/10 bg-[#0c1220] shadow-lift">
+            <div className="relative flex flex-col items-center bg-gradient-to-b from-white/[0.06] to-transparent px-5 pb-4 pt-6">
               <button
                 type="button"
                 onClick={() => setOpen(false)}
                 aria-label={t.close}
-                className="absolute right-3 top-3 rounded-full p-2 text-slate-400 hover:bg-border-subtle/50 hover:text-white"
+                className="absolute right-3 top-3 rounded-full p-2 text-slate-400 hover:bg-white/[0.06] hover:text-white"
               >
                 <X className="h-4 w-4" />
               </button>
               <img
                 src="/icon-512.png"
                 alt="Traduttore"
-                className="h-24 w-24 rounded-[1.35rem] shadow-xl ring-2 ring-white/10"
+                className="h-24 w-24 rounded-[1.4rem] shadow-lift ring-1 ring-white/15"
               />
               <h2
                 id="install-app-title"
-                className="mt-4 text-lg font-semibold text-slate-50"
+                className="font-display brand-mark mt-4 text-2xl font-extrabold"
               >
                 Traduttore
               </h2>
