@@ -111,10 +111,21 @@ export function ChatWindow() {
           setOtherProfile(updated)
         },
       )
-      .subscribe()
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') void fetchOther()
+      })
+
+    function refreshIfVisible() {
+      if (document.visibilityState === 'visible') void fetchOther()
+    }
+
+    document.addEventListener('visibilitychange', refreshIfVisible)
+    window.addEventListener('focus', refreshIfVisible)
 
     return () => {
       cancelled = true
+      document.removeEventListener('visibilitychange', refreshIfVisible)
+      window.removeEventListener('focus', refreshIfVisible)
       void supabase.removeChannel(channel)
     }
   }, [profile?.id])

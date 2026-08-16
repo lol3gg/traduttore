@@ -16,13 +16,44 @@ interface TranslateRequest {
   target_lang: Lang
 }
 
+function isLang(value: unknown): value is Lang {
+  return value === 'it' || value === 'ru'
+}
+
+function hasCyrillic(text: string): boolean {
+  return /[\u0400-\u04FF]/.test(text)
+}
+
+function hasLatinLetters(text: string): boolean {
+  return /[A-Za-zÀ-ÿ]/.test(text)
+}
+
+/** Reject junk translations (e.g. MyMemory returning Spanish for it→ru). */
+function isPlausibleTranslation(text: string, target: Lang): boolean {
+  const trimmed = text.trim()
+  if (!trimmed) return false
+  // Same as source with only punctuation / numbers is ok for short noise
+  if (target === 'ru') {
+    if (hasCyrillic(trimmed)) return true
+    // Allow non-letter content (emoji, numbers)
+    return !hasLatinLetters(trimmed)
+  }
+  // target it: must look Italian/Latin, not Cyrillic-only wrong dump
+  if (hasLatinLetters(trimmed)) return true
+  return !hasCyrillic(trimmed)
+}
+
 async function translateWithDeepL(
   text: string,
   source: Lang,
   target: Lang,
   apiKey: string,
 ): Promise<string> {
-  const deeplResponse = await fetch('https://api-free.deepl.com/v2/translate', {
+  const endpoint = apiKey.endsWith(':fx')
+    ? 'https://api-free.deepl.com/v2/translate'
+    : 'https://api.deepl.com/v2/translate'
+
+  const deeplResponse = await fetch(endpoint, {
     method: 'POST',
     headers: {
       Authorization: `DeepL-Auth-Key ${apiKey}`,
@@ -46,21 +77,32 @@ async function translateWithDeepL(
   return translated
 }
 
-/** Free fallback so chat works even without DEEPL_API_KEY */
-async function translateWithMyMemory(
-  text: string,
-  source: Lang,
-  target: Lang,
-): Promise<string> {
-  const url = new URL('https://api.mymemory.translated.net/get')
+/**
+ * Google Translate (unofficial gtx client) — reliable for it↔ru.
+ * Used when DeepL is missing or fails.
+ */
+async function translateWithGoogle(text: string, source: Lang, target: Lang): Promise<string> {
+  const url = new URL('https://translate.googleapis.com/translate_a/single')
+  url.searchParams.set('client', 'gtx')
+  url.searchParams.set('sl', source)
+  url.searchParams.set('tl', target)
+  url.searchParams.set('dt', 't')
   url.searchParams.set('q', text)
-  url.searchParams.set('langpair', `${source}|${target}`)
 
   const res = await fetch(url.toString())
-  if (!res.ok) throw new Error(`MyMemory ${res.status}`)
+  if (!res.ok) throw new Error(`Google Translate ${res.status}`)
+
   const data = await res.json()
-  const translated = data?.responseData?.translatedText as string | undefined
-  if (!translated) throw new Error('Empty MyMemory translation')
+  // Response shape: [[["translated","original",...], ...], ...]
+  const chunks = data?.[0]
+  if (!Array.isArray(chunks)) throw new Error('Unexpected Google Translate payload')
+
+  const translated = chunks
+    .map((part: unknown) => (Array.isArray(part) ? String(part[0] ?? '') : ''))
+    .join('')
+    .trim()
+
+  if (!translated) throw new Error('Empty Google translation')
   return translated
 }
 
@@ -80,11 +122,22 @@ Deno.serve(async (req: Request) => {
     const body = (await req.json()) as TranslateRequest
     const { message_id, text, source_lang, target_lang } = body
 
-    if (!message_id || !text?.trim() || !source_lang || !target_lang) {
+    if (!message_id || !text?.trim() || !isLang(source_lang) || !isLang(target_lang)) {
       return new Response(
         JSON.stringify({
-          error: 'Missing required fields: message_id, text, source_lang, target_lang',
+          error:
+            'Invalid request: message_id, text, and source_lang/target_lang must be it or ru only',
         }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        },
+      )
+    }
+
+    if (source_lang === target_lang) {
+      return new Response(
+        JSON.stringify({ error: 'source_lang and target_lang must differ (it ↔ ru)' }),
         {
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -103,32 +156,50 @@ Deno.serve(async (req: Request) => {
       })
     }
 
-    let translatedText: string
     const deeplApiKey = Deno.env.get('DEEPL_API_KEY')
+    let translatedText: string | null = null
+    const errors: string[] = []
 
-    try {
-      if (deeplApiKey) {
-        translatedText = await translateWithDeepL(
+    if (deeplApiKey) {
+      try {
+        const candidate = await translateWithDeepL(
           text,
           source_lang,
           target_lang,
           deeplApiKey,
         )
-      } else {
-        console.warn('DEEPL_API_KEY missing — using MyMemory fallback')
-        translatedText = await translateWithMyMemory(text, source_lang, target_lang)
+        if (isPlausibleTranslation(candidate, target_lang)) {
+          translatedText = candidate
+        } else {
+          errors.push(`DeepL implausible for ${target_lang}: ${candidate}`)
+        }
+      } catch (err) {
+        errors.push(`DeepL: ${err instanceof Error ? err.message : String(err)}`)
       }
-    } catch (primaryError) {
-      console.error('Primary translate failed, trying MyMemory:', primaryError)
+    }
+
+    if (!translatedText) {
       try {
-        translatedText = await translateWithMyMemory(text, source_lang, target_lang)
-      } catch (fallbackError) {
-        console.error('All translation providers failed:', fallbackError)
-        return new Response(JSON.stringify({ error: 'Translation failed' }), {
+        const candidate = await translateWithGoogle(text, source_lang, target_lang)
+        if (isPlausibleTranslation(candidate, target_lang)) {
+          translatedText = candidate
+        } else {
+          errors.push(`Google implausible for ${target_lang}: ${candidate}`)
+        }
+      } catch (err) {
+        errors.push(`Google: ${err instanceof Error ? err.message : String(err)}`)
+      }
+    }
+
+    if (!translatedText) {
+      console.error('Translation failed:', errors.join(' | '))
+      return new Response(
+        JSON.stringify({ error: 'Translation failed', details: errors }),
+        {
           status: 500,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        })
-      }
+        },
+      )
     }
 
     const supabase = createClient(supabaseUrl, serviceRoleKey)

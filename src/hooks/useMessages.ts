@@ -30,7 +30,7 @@ export function useMessages() {
   useEffect(() => {
     let cancelled = false
 
-    async function fetchMessages() {
+    async function fetchMessages(isRefresh = false) {
       try {
         const { data, error } = await supabase
           .from('messages')
@@ -45,11 +45,11 @@ export function useMessages() {
           setMessages((data as Message[]).map(asMessage))
         }
       } finally {
-        if (!cancelled) setLoadingMessages(false)
+        if (!cancelled && !isRefresh) setLoadingMessages(false)
       }
     }
 
-    void fetchMessages()
+    void fetchMessages(false)
 
     const channel = supabase
       .channel('messages-realtime')
@@ -93,10 +93,28 @@ export function useMessages() {
           })
         },
       )
-      .subscribe()
+      .subscribe((status) => {
+        // After tab sleep / reconnect, pull latest rows (translations + missed inserts)
+        if (status === 'SUBSCRIBED') {
+          void fetchMessages(true)
+        }
+      })
+
+    function refreshIfVisible() {
+      if (document.visibilityState === 'visible') {
+        void fetchMessages(true)
+      }
+    }
+
+    document.addEventListener('visibilitychange', refreshIfVisible)
+    window.addEventListener('focus', refreshIfVisible)
+    window.addEventListener('online', refreshIfVisible)
 
     return () => {
       cancelled = true
+      document.removeEventListener('visibilitychange', refreshIfVisible)
+      window.removeEventListener('focus', refreshIfVisible)
+      window.removeEventListener('online', refreshIfVisible)
       void supabase.removeChannel(channel)
     }
   }, [])
