@@ -1,5 +1,6 @@
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts'
 import { createClient } from 'npm:@supabase/supabase-js@2'
+import webpush from 'npm:web-push@3.6.7'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -7,13 +8,29 @@ const corsHeaders = {
     'authorization, x-client-info, apikey, content-type',
 }
 
-const ONESIGNAL_APP_ID = '1815d233-b8ca-4472-8c01-cb1a5c415cb4'
+const APP_URL_DEFAULT = 'https://traduttore-six.vercel.app'
+
+/** VAPID keys for native Web Push (private 2-person app) */
+const VAPID_PUBLIC_KEY =
+  Deno.env.get('VAPID_PUBLIC_KEY') ||
+  'BPgdX6Q28x3PO0PXObHluwMRI_9plHhaKnNWvsiMH5IKEHXvX054oREqc2wOKlVflhir2XgYP1AkdIWPHh_Umls'
+const VAPID_PRIVATE_KEY =
+  Deno.env.get('VAPID_PRIVATE_KEY') || 'FWUK7W0Urt5JORXS4VnptGEjT1qKR3rMJhYsD0c_o_E'
+const VAPID_SUBJECT = Deno.env.get('VAPID_SUBJECT') || 'mailto:nicolacarletti6@gmail.com'
+
+webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY)
 
 interface NotifyRequest {
   message_id: string
   recipient_id: string
   text_preview: string
   sender_name: string
+}
+
+interface PushSubscriptionJSON {
+  endpoint: string
+  expirationTime?: number | null
+  keys?: { p256dh?: string; auth?: string }
 }
 
 function truncatePreview(text: string, max = 100): string {
@@ -53,9 +70,7 @@ Deno.serve(async (req: Request) => {
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')
     const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
-    const onesignalRestKey = Deno.env.get('ONESIGNAL_REST_API_KEY')
-    const appUrl = Deno.env.get('APP_URL')
-    const onesignalAppId = Deno.env.get('ONESIGNAL_APP_ID') || ONESIGNAL_APP_ID
+    const appUrl = Deno.env.get('APP_URL') || APP_URL_DEFAULT
 
     if (!supabaseUrl || !serviceRoleKey) {
       console.error('Supabase credentials not configured')
@@ -65,19 +80,11 @@ Deno.serve(async (req: Request) => {
       })
     }
 
-    if (!onesignalRestKey) {
-      console.error('ONESIGNAL_REST_API_KEY is not set')
-      return new Response(JSON.stringify({ error: 'OneSignal REST API key missing' }), {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
-    }
-
     const supabase = createClient(supabaseUrl, serviceRoleKey)
 
     const { data: recipient, error: recipientError } = await supabase
       .from('profiles')
-      .select('onesignal_player_id')
+      .select('push_subscription, onesignal_player_id, is_online')
       .eq('id', recipient_id)
       .maybeSingle()
 
@@ -92,11 +99,16 @@ Deno.serve(async (req: Request) => {
       )
     }
 
-    const subscriptionId = recipient?.onesignal_player_id as string | null | undefined
+    const subscription = recipient?.push_subscription as PushSubscriptionJSON | null | undefined
 
-    if (!subscriptionId) {
+    if (!subscription?.endpoint || !subscription.keys?.p256dh || !subscription.keys?.auth) {
       return new Response(
-        JSON.stringify({ success: true, skipped: true, reason: 'no_player_id' }),
+        JSON.stringify({
+          success: true,
+          skipped: true,
+          reason: 'no_push_subscription',
+          hint: 'Recipient must tap Attiva notifiche in the app',
+        }),
         {
           status: 200,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -105,41 +117,69 @@ Deno.serve(async (req: Request) => {
     }
 
     const preview = truncatePreview(text_preview)
-
-    const onesignalResponse = await fetch('https://api.onesignal.com/notifications', {
-      method: 'POST',
-      headers: {
-        Authorization: `Key ${onesignalRestKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        app_id: onesignalAppId,
-        include_subscription_ids: [subscriptionId],
-        headings: { en: sender_name, it: sender_name, ru: sender_name },
-        contents: { en: preview, it: preview, ru: preview },
-        url: appUrl || undefined,
-        data: { message_id },
-      }),
+    const payload = JSON.stringify({
+      title: sender_name,
+      body: preview,
+      url: appUrl,
+      message_id,
     })
 
-    if (!onesignalResponse.ok) {
-      const errorBody = await onesignalResponse.text()
-      console.error('OneSignal API error:', onesignalResponse.status, errorBody)
+    try {
+      const result = await webpush.sendNotification(
+        {
+          endpoint: subscription.endpoint,
+          keys: {
+            p256dh: subscription.keys.p256dh,
+            auth: subscription.keys.auth,
+          },
+        },
+        payload,
+        {
+          TTL: 60 * 60,
+          urgency: 'high',
+        },
+      )
+
       return new Response(
-        JSON.stringify({ error: 'OneSignal notification failed', details: errorBody }),
+        JSON.stringify({
+          success: true,
+          statusCode: result.statusCode,
+        }),
+        {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        },
+      )
+    } catch (pushError) {
+      const statusCode =
+        typeof pushError === 'object' &&
+        pushError &&
+        'statusCode' in pushError &&
+        typeof (pushError as { statusCode?: number }).statusCode === 'number'
+          ? (pushError as { statusCode: number }).statusCode
+          : undefined
+
+      // Gone / expired subscription — clear it
+      if (statusCode === 404 || statusCode === 410) {
+        await supabase
+          .from('profiles')
+          .update({ push_subscription: null, onesignal_player_id: null })
+          .eq('id', recipient_id)
+      }
+
+      console.error('Web Push send failed:', pushError)
+      return new Response(
+        JSON.stringify({
+          error: 'Web Push send failed',
+          details: pushError instanceof Error ? pushError.message : String(pushError),
+          statusCode,
+        }),
         {
           status: 500,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         },
       )
     }
-
-    const result = await onesignalResponse.json()
-
-    return new Response(JSON.stringify({ success: true, result }), {
-      status: 200,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    })
   } catch (error) {
     console.error('Unexpected error in send-notification:', error)
     return new Response(JSON.stringify({ error: 'Internal server error' }), {

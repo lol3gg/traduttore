@@ -2,7 +2,7 @@ import { ProfileProvider, useProfile } from './context/ProfileContext'
 import { ProfileSelector } from './components/ProfileSelector'
 import { ChatWindow } from './components/ChatWindow'
 import { InstallPrompt } from './components/InstallPrompt'
-import { OneSignalVerificationDialog } from './components/OneSignalVerificationDialog'
+import { PushPermissionDialog } from './components/PushPermissionDialog'
 
 function SwitchProfileButton() {
   const { setProfile } = useProfile()
@@ -35,7 +35,7 @@ function SwitchProfileButton() {
 }
 
 function AppContent() {
-  const { profile, loading, saveOneSignalSubscriptionId } = useProfile()
+  const { profile, loading, savePushSubscription } = useProfile()
 
   if (loading) {
     return (
@@ -50,7 +50,7 @@ function AppContent() {
 
   return (
     <>
-      <OneSignalVerificationDialog onSubscribed={saveOneSignalSubscriptionId} />
+      <PushPermissionDialog onSubscribed={(sub) => void savePushSubscription(sub)} />
       {!profile ? (
         <ProfileSelector />
       ) : (

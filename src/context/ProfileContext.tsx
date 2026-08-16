@@ -7,14 +7,14 @@ import {
   type ReactNode,
 } from 'react'
 import { supabase } from '../lib/supabase'
-import { loginOneSignalUser, logoutOneSignalUser } from '../lib/onesignal'
+import { enableWebPush, type PushSubscriptionJSON } from '../lib/webPush'
 import type { Profile } from '../types'
 
 interface ProfileContextValue {
   profile: Profile | null
   setProfile: (profile: Profile | null) => void
   loading: boolean
-  saveOneSignalSubscriptionId: (subscriptionId: string) => Promise<void>
+  savePushSubscription: (subscription: PushSubscriptionJSON) => Promise<void>
 }
 
 const PROFILE_STORAGE_KEY = 'chat_profile_id'
@@ -25,32 +25,41 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
   const [profile, setProfileState] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
 
-  const setProfile = useCallback((next: Profile | null) => {
-    if (next) {
-      localStorage.setItem(PROFILE_STORAGE_KEY, next.id)
-      void loginOneSignalUser(next.id)
-    } else {
-      localStorage.removeItem(PROFILE_STORAGE_KEY)
-      void logoutOneSignalUser()
-    }
-    setProfileState(next)
-  }, [])
-
-  const saveOneSignalSubscriptionId = useCallback(
-    async (subscriptionId: string) => {
+  const savePushSubscription = useCallback(
+    async (subscription: PushSubscriptionJSON) => {
       const profileId = profile?.id ?? localStorage.getItem(PROFILE_STORAGE_KEY)
-      if (!profileId || !subscriptionId) return
+      if (!profileId || !subscription?.endpoint) return
 
       const { error } = await supabase
         .from('profiles')
-        .update({ onesignal_player_id: subscriptionId })
+        .update({
+          push_subscription: subscription,
+          // Keep legacy column as endpoint marker for debugging
+          onesignal_player_id: subscription.endpoint.slice(-64),
+        })
         .eq('id', profileId)
 
       if (error) {
-        console.warn('Failed to save onesignal_player_id:', error.message)
+        console.warn('Failed to save push_subscription:', error.message)
       }
     },
     [profile?.id],
+  )
+
+  const setProfile = useCallback(
+    (next: Profile | null) => {
+      if (next) {
+        localStorage.setItem(PROFILE_STORAGE_KEY, next.id)
+        // Refresh subscription when switching profile (permission already granted)
+        void enableWebPush().then((sub) => {
+          if (sub) void savePushSubscription(sub)
+        })
+      } else {
+        localStorage.removeItem(PROFILE_STORAGE_KEY)
+      }
+      setProfileState(next)
+    },
+    [savePushSubscription],
   )
 
   useEffect(() => {
@@ -78,7 +87,11 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
           setProfileState(null)
         } else {
           setProfileState(data as Profile)
-          void loginOneSignalUser(data.id)
+          if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+            void enableWebPush().then((sub) => {
+              if (sub) void savePushSubscription(sub)
+            })
+          }
         }
       } catch (err) {
         console.error('Failed to restore profile:', err)
@@ -96,11 +109,11 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [savePushSubscription])
 
   return (
     <ProfileContext.Provider
-      value={{ profile, setProfile, loading, saveOneSignalSubscriptionId }}
+      value={{ profile, setProfile, loading, savePushSubscription }}
     >
       {children}
     </ProfileContext.Provider>
