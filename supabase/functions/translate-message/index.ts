@@ -28,19 +28,43 @@ function hasLatinLetters(text: string): boolean {
   return /[A-Za-zÀ-ÿ]/.test(text)
 }
 
-/** Reject junk translations (e.g. MyMemory returning Spanish for it→ru). */
 function isPlausibleTranslation(text: string, target: Lang): boolean {
   const trimmed = text.trim()
   if (!trimmed) return false
-  // Same as source with only punctuation / numbers is ok for short noise
   if (target === 'ru') {
     if (hasCyrillic(trimmed)) return true
-    // Allow non-letter content (emoji, numbers)
     return !hasLatinLetters(trimmed)
   }
-  // target it: must look Italian/Latin, not Cyrillic-only wrong dump
   if (hasLatinLetters(trimmed)) return true
   return !hasCyrillic(trimmed)
+}
+
+async function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<T>((_, reject) => {
+        timer = setTimeout(() => reject(new Error(`${label} timeout ${ms}ms`)), ms)
+      }),
+    ])
+  } finally {
+    if (timer !== undefined) clearTimeout(timer)
+  }
+}
+
+async function translateWithMyMemory(text: string, source: Lang, target: Lang): Promise<string> {
+  const url = new URL('https://api.mymemory.translated.net/get')
+  url.searchParams.set('q', text)
+  url.searchParams.set('langpair', `${source}|${target}`)
+
+  const res = await fetch(url.toString())
+  if (!res.ok) throw new Error(`MyMemory ${res.status}`)
+  const data = await res.json()
+  const translated = String(data?.responseData?.translatedText ?? '').trim()
+  if (!translated) throw new Error('Empty MyMemory')
+  if (/mymemory warning/i.test(translated)) throw new Error(translated)
+  return translated
 }
 
 async function translateWithDeepL(
@@ -77,38 +101,6 @@ async function translateWithDeepL(
   return translated
 }
 
-/**
- * Lingva (Google front) — reliable for it↔ru from edge IPs.
- * Google gtx often returns 429 from datacenter ranges.
- */
-async function translateWithLingva(text: string, source: Lang, target: Lang): Promise<string> {
-  const hosts = [
-    'https://lingva.ml',
-    'https://lingva.garudalinux.org',
-    'https://translate.plausibly.com',
-  ]
-
-  let lastError: unknown
-  for (const host of hosts) {
-    try {
-      const url = `${host}/api/v1/${source}/${target}/${encodeURIComponent(text)}`
-      const res = await fetch(url)
-      if (!res.ok) throw new Error(`Lingva ${host} ${res.status}`)
-      const data = await res.json()
-      const translated = String(data?.translation ?? '').trim()
-      if (!translated) throw new Error(`Empty Lingva response from ${host}`)
-      return translated
-    } catch (err) {
-      lastError = err
-    }
-  }
-
-  throw lastError instanceof Error ? lastError : new Error('Lingva failed')
-}
-
-/**
- * Google Translate (unofficial gtx client) — backup.
- */
 async function translateWithGoogle(text: string, source: Lang, target: Lang): Promise<string> {
   const url = new URL('https://translate.googleapis.com/translate_a/single')
   url.searchParams.set('client', 'gtx')
@@ -121,7 +113,6 @@ async function translateWithGoogle(text: string, source: Lang, target: Lang): Pr
   if (!res.ok) throw new Error(`Google Translate ${res.status}`)
 
   const data = await res.json()
-  // Response shape: [[["translated","original",...], ...], ...]
   const chunks = data?.[0]
   if (!Array.isArray(chunks)) throw new Error('Unexpected Google Translate payload')
 
@@ -132,6 +123,66 @@ async function translateWithGoogle(text: string, source: Lang, target: Lang): Pr
 
   if (!translated) throw new Error('Empty Google translation')
   return translated
+}
+
+type Candidate = { translated: string; via: string }
+
+async function translateFast(
+  text: string,
+  source: Lang,
+  target: Lang,
+  deeplApiKey: string | undefined,
+): Promise<Candidate> {
+  const errors: string[] = []
+
+  const attempt = async (
+    label: string,
+    run: () => Promise<string>,
+    ms = 4500,
+  ): Promise<Candidate | null> => {
+    try {
+      const translated = await withTimeout(run(), ms, label)
+      if (isPlausibleTranslation(translated, target)) {
+        return { translated, via: label }
+      }
+      errors.push(`${label} implausible: ${translated}`)
+    } catch (err) {
+      errors.push(`${label}: ${err instanceof Error ? err.message : String(err)}`)
+    }
+    return null
+  }
+
+  // MyMemory is reliable from edge IPs; Google often 429s from datacenters
+  const primary: Array<Promise<Candidate | null>> = [
+    attempt('mymemory', () => translateWithMyMemory(text, source, target)),
+    attempt('google', () => translateWithGoogle(text, source, target), 3500),
+  ]
+  if (deeplApiKey) {
+    primary.push(
+      attempt('deepl', () => translateWithDeepL(text, source, target, deeplApiKey), 4500),
+    )
+  }
+
+  const first = await new Promise<Candidate | null>((resolve) => {
+    let remaining = primary.length
+    let done = false
+
+    for (const p of primary) {
+      void p.then((result) => {
+        if (done) return
+        if (result) {
+          done = true
+          resolve(result)
+          return
+        }
+        remaining -= 1
+        if (remaining === 0) resolve(null)
+      })
+    }
+  })
+
+  if (first) return first
+  throw new Error(errors.join(' | ') || 'Translation failed')
 }
 
 Deno.serve(async (req: Request) => {
@@ -184,58 +235,25 @@ Deno.serve(async (req: Request) => {
       })
     }
 
-    const deeplApiKey = Deno.env.get('DEEPL_API_KEY')
-    let translatedText: string | null = null
-    const errors: string[] = []
+    let translatedText: string
+    let via: string
 
-    if (deeplApiKey) {
-      try {
-        const candidate = await translateWithDeepL(
-          text,
-          source_lang,
-          target_lang,
-          deeplApiKey,
-        )
-        if (isPlausibleTranslation(candidate, target_lang)) {
-          translatedText = candidate
-        } else {
-          errors.push(`DeepL implausible for ${target_lang}: ${candidate}`)
-        }
-      } catch (err) {
-        errors.push(`DeepL: ${err instanceof Error ? err.message : String(err)}`)
-      }
-    }
-
-    if (!translatedText) {
-      try {
-        const candidate = await translateWithLingva(text, source_lang, target_lang)
-        if (isPlausibleTranslation(candidate, target_lang)) {
-          translatedText = candidate
-        } else {
-          errors.push(`Lingva implausible for ${target_lang}: ${candidate}`)
-        }
-      } catch (err) {
-        errors.push(`Lingva: ${err instanceof Error ? err.message : String(err)}`)
-      }
-    }
-
-    if (!translatedText) {
-      try {
-        const candidate = await translateWithGoogle(text, source_lang, target_lang)
-        if (isPlausibleTranslation(candidate, target_lang)) {
-          translatedText = candidate
-        } else {
-          errors.push(`Google implausible for ${target_lang}: ${candidate}`)
-        }
-      } catch (err) {
-        errors.push(`Google: ${err instanceof Error ? err.message : String(err)}`)
-      }
-    }
-
-    if (!translatedText) {
-      console.error('Translation failed:', errors.join(' | '))
+    try {
+      const result = await translateFast(
+        text,
+        source_lang,
+        target_lang,
+        Deno.env.get('DEEPL_API_KEY'),
+      )
+      translatedText = result.translated
+      via = result.via
+    } catch (err) {
+      console.error('Translation failed:', err)
       return new Response(
-        JSON.stringify({ error: 'Translation failed', details: errors }),
+        JSON.stringify({
+          error: 'Translation failed',
+          details: err instanceof Error ? err.message : String(err),
+        }),
         {
           status: 500,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -270,6 +288,7 @@ Deno.serve(async (req: Request) => {
         message_id,
         translated_text: translatedText,
         translated_lang: target_lang,
+        via,
       }),
       {
         status: 200,

@@ -116,12 +116,21 @@ Deno.serve(async (req: Request) => {
       )
     }
 
+    // Unread = messages not from recipient that are still unread (incl. this one)
+    const { count: unreadCount } = await supabase
+      .from('messages')
+      .select('id', { count: 'exact', head: true })
+      .neq('sender_id', recipient_id)
+      .is('read_at', null)
+
+    const unread = Math.max(1, unreadCount ?? 1)
     const preview = truncatePreview(text_preview)
     const payload = JSON.stringify({
       title: sender_name,
       body: preview,
       url: appUrl,
       message_id,
+      unread_count: unread,
     })
 
     try {

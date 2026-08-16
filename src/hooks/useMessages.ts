@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { translateClient } from '../lib/translateClient'
 import type { Lang, Message } from '../types'
 
 const MESSAGE_COLUMNS =
@@ -23,9 +24,96 @@ function extensionFromMime(mime: string) {
   return 'jpg'
 }
 
-export function useMessages() {
+const translatingIds = new Set<string>()
+
+export function useMessages(viewerId?: string | null) {
   const [messages, setMessages] = useState<Message[]>([])
   const [loadingMessages, setLoadingMessages] = useState(true)
+  const viewerIdRef = useRef(viewerId)
+  viewerIdRef.current = viewerId
+
+  const applyTranslationLocally = useCallback(
+    (messageId: string, translatedText: string, translatedLang: Lang) => {
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === messageId
+            ? {
+                ...m,
+                translated_text: translatedText,
+                translated_lang: translatedLang,
+              }
+            : m,
+        ),
+      )
+    },
+    [],
+  )
+
+  const requestTranslation = useCallback(
+    (messageId: string, text: string, sourceLang: Lang) => {
+      if (!text.trim() || messageId.startsWith('temp-')) return
+      if (translatingIds.has(messageId)) return
+      translatingIds.add(messageId)
+
+      const targetLang: Lang = sourceLang === 'it' ? 'ru' : 'it'
+      let finished = false
+
+      const finish = (translated: string, lang: Lang) => {
+        if (finished) {
+          applyTranslationLocally(messageId, translated, lang)
+          return
+        }
+        finished = true
+        translatingIds.delete(messageId)
+        applyTranslationLocally(messageId, translated, lang)
+      }
+
+      // Browser MyMemory — fast, avoids edge IP rate limits
+      void translateClient(text, sourceLang, targetLang).then(async (quick) => {
+        if (!quick) return
+        finish(quick, targetLang)
+        await supabase
+          .from('messages')
+          .update({ translated_text: quick, translated_lang: targetLang })
+          .eq('id', messageId)
+      })
+
+      // Edge race (MyMemory/Google/DeepL) as backup / second writer
+      void supabase.functions
+        .invoke('translate-message', {
+          body: {
+            message_id: messageId,
+            text,
+            source_lang: sourceLang,
+            target_lang: targetLang,
+          },
+        })
+        .then(({ data, error }) => {
+          if (error) {
+            console.error('translate-message failed:', error.message)
+            if (!finished) translatingIds.delete(messageId)
+            return
+          }
+          const payload = data as {
+            translated_text?: string
+            translated_lang?: Lang
+          } | null
+          if (payload?.translated_text) {
+            finish(
+              payload.translated_text,
+              payload.translated_lang ?? targetLang,
+            )
+          } else if (!finished) {
+            translatingIds.delete(messageId)
+          }
+        })
+        .catch((err) => {
+          console.error('translate-message failed:', err)
+          if (!finished) translatingIds.delete(messageId)
+        })
+    },
+    [applyTranslationLocally],
+  )
 
   useEffect(() => {
     let cancelled = false
@@ -42,7 +130,16 @@ export function useMessages() {
         if (error) {
           console.error('Failed to load messages:', error.message)
         } else if (data) {
-          setMessages((data as Message[]).map(asMessage))
+          const rows = (data as Message[]).map(asMessage)
+          setMessages(rows)
+
+          // Catch untranslated messages (e.g. after failed/slow prior invoke)
+          const me = viewerIdRef.current
+          for (const m of rows) {
+            if (!m.original_text?.trim() || m.translated_text) continue
+            if (me && m.sender_id === me) continue
+            requestTranslation(m.id, m.original_text, m.original_lang)
+          }
         }
       } finally {
         if (!cancelled && !isRefresh) setLoadingMessages(false)
@@ -75,6 +172,20 @@ export function useMessages() {
             )
             return [...withoutOptimistic, incoming]
           })
+
+          // Recipient also kicks translation immediately (don't wait only on sender)
+          const me = viewerIdRef.current
+          if (
+            incoming.original_text?.trim() &&
+            !incoming.translated_text &&
+            (!me || incoming.sender_id !== me)
+          ) {
+            requestTranslation(
+              incoming.id,
+              incoming.original_text,
+              incoming.original_lang,
+            )
+          }
         },
       )
       .on(
@@ -94,7 +205,6 @@ export function useMessages() {
         },
       )
       .subscribe((status) => {
-        // After tab sleep / reconnect, pull latest rows (translations + missed inserts)
         if (status === 'SUBSCRIBED') {
           void fetchMessages(true)
         }
@@ -117,24 +227,7 @@ export function useMessages() {
       window.removeEventListener('online', refreshIfVisible)
       void supabase.removeChannel(channel)
     }
-  }, [])
-
-  const applyTranslationLocally = useCallback(
-    (messageId: string, translatedText: string, translatedLang: Lang) => {
-      setMessages((prev) =>
-        prev.map((m) =>
-          m.id === messageId
-            ? {
-                ...m,
-                translated_text: translatedText,
-                translated_lang: translatedLang,
-              }
-            : m,
-        ),
-      )
-    },
-    [],
-  )
+  }, [requestTranslation])
 
   const invokeSideEffects = useCallback(
     (
@@ -144,39 +237,10 @@ export function useMessages() {
       recipientId: string,
       senderName: string,
     ) => {
-      const targetLang: Lang = senderLang === 'it' ? 'ru' : 'it'
       const preview = text.trim() || '📷'
 
       if (text.trim()) {
-        void supabase.functions
-          .invoke('translate-message', {
-            body: {
-              message_id: messageId,
-              text,
-              source_lang: senderLang,
-              target_lang: targetLang,
-            },
-          })
-          .then(({ data, error }) => {
-            if (error) {
-              console.error('translate-message failed:', error.message)
-              return
-            }
-            const payload = data as {
-              translated_text?: string
-              translated_lang?: Lang
-            } | null
-            if (payload?.translated_text) {
-              applyTranslationLocally(
-                messageId,
-                payload.translated_text,
-                payload.translated_lang ?? targetLang,
-              )
-            }
-          })
-          .catch((err) => {
-            console.error('translate-message failed:', err)
-          })
+        requestTranslation(messageId, text, senderLang)
       }
 
       void supabase.functions
@@ -195,7 +259,38 @@ export function useMessages() {
           console.error('send-notification failed:', err)
         })
     },
-    [applyTranslationLocally],
+    [requestTranslation],
+  )
+
+  const markMessagesRead = useCallback(async (readerId: string) => {
+    const now = new Date().toISOString()
+
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.sender_id !== readerId && !m.read_at ? { ...m, read_at: now } : m,
+      ),
+    )
+
+    const { error } = await supabase
+      .from('messages')
+      .update({ read_at: now })
+      .neq('sender_id', readerId)
+      .is('read_at', null)
+
+    if (error) {
+      console.error('Failed to mark messages read:', error.message)
+    }
+  }, [])
+
+  const unreadCount = useCallback(
+    (readerId: string) =>
+      messages.filter(
+        (m) =>
+          !m.id.startsWith('temp-') &&
+          m.sender_id !== readerId &&
+          !m.read_at,
+      ).length,
+    [messages],
   )
 
   const sendMessage = useCallback(
@@ -360,5 +455,12 @@ export function useMessages() {
     [invokeSideEffects],
   )
 
-  return { messages, sendMessage, retryMessage, loadingMessages }
+  return {
+    messages,
+    sendMessage,
+    retryMessage,
+    loadingMessages,
+    markMessagesRead,
+    unreadCount,
+  }
 }

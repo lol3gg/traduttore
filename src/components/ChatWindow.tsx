@@ -11,6 +11,8 @@ import { useProfile } from '../context/ProfileContext'
 import { useMessages } from '../hooks/useMessages'
 import { usePresence } from '../hooks/usePresence'
 import { useTyping } from '../hooks/useTyping'
+import { clearUnreadBadge, setUnreadBadge } from '../lib/appBadge'
+import { playSoftChime } from '../lib/softChime'
 import { supabase } from '../lib/supabase'
 import { translations } from '../i18n/translations'
 import type { Message, Profile } from '../types'
@@ -18,6 +20,17 @@ import { Avatar } from './Avatar'
 import { MessageBubble } from './MessageBubble'
 import { InstallAppButton } from './InstallAppButton'
 import { OnlineStatus } from './OnlineStatus'
+
+async function syncBadgeWithServiceWorker(count: number) {
+  try {
+    const reg = await navigator.serviceWorker?.ready
+    reg?.active?.postMessage(
+      count > 0 ? { type: 'set-badge', count } : { type: 'clear-badge' },
+    )
+  } catch {
+    /* ignore */
+  }
+}
 
 function MessageSkeleton() {
   return (
@@ -37,7 +50,14 @@ function MessageSkeleton() {
 
 export function ChatWindow() {
   const { profile } = useProfile()
-  const { messages, sendMessage, retryMessage, loadingMessages } = useMessages()
+  const {
+    messages,
+    sendMessage,
+    retryMessage,
+    loadingMessages,
+    markMessagesRead,
+    unreadCount,
+  } = useMessages(profile?.id)
   const { onlineStatus } = usePresence(profile)
   const { typingStatus, notifyTyping, clearTypingFor } = useTyping(profile)
   const [otherProfile, setOtherProfile] = useState<Profile | null>(null)
@@ -51,10 +71,58 @@ export function ChatWindow() {
   const seededIdsRef = useRef(false)
   const knownIdsRef = useRef<Set<string>>(new Set())
   const wasOtherOnlineRef = useRef(false)
+  const profileIdRef = useRef(profile?.id)
+  profileIdRef.current = profile?.id
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, imagePreview])
+
+  // Soft chime from service worker when push arrives with app focused
+  useEffect(() => {
+    function onSwMessage(event: MessageEvent) {
+      if (event.data?.type === 'soft-chime') {
+        playSoftChime()
+      }
+    }
+    navigator.serviceWorker?.addEventListener('message', onSwMessage)
+    return () => navigator.serviceWorker?.removeEventListener('message', onSwMessage)
+  }, [])
+
+  // Mark read + clear home-screen badge while chat is open/visible
+  useEffect(() => {
+    if (!profile || loadingMessages) return
+
+    function syncReadState() {
+      if (document.visibilityState !== 'visible') return
+      void markMessagesRead(profile!.id)
+      void clearUnreadBadge()
+      void syncBadgeWithServiceWorker(0)
+    }
+
+    syncReadState()
+    document.addEventListener('visibilitychange', syncReadState)
+    window.addEventListener('focus', syncReadState)
+    return () => {
+      document.removeEventListener('visibilitychange', syncReadState)
+      window.removeEventListener('focus', syncReadState)
+    }
+  }, [profile, loadingMessages, markMessagesRead, messages.length])
+
+  // When app is backgrounded, keep badge count in sync
+  useEffect(() => {
+    if (!profile) return
+
+    function onHide() {
+      if (document.visibilityState === 'visible') return
+      const count = unreadCount(profile!.id)
+      void setUnreadBadge(count)
+      void syncBadgeWithServiceWorker(count)
+    }
+
+    document.addEventListener('visibilitychange', onHide)
+    return () => document.removeEventListener('visibilitychange', onHide)
+  }, [profile, unreadCount, messages])
 
   useEffect(() => {
     if (loadingMessages) return
@@ -76,12 +144,26 @@ export function ChatWindow() {
 
     if (fresh.length === 0) return
 
+    const me = profileIdRef.current
+    const incomingFromOther = fresh.some((id) => {
+      const msg = messages.find((m) => m.id === id)
+      return msg && me && msg.sender_id !== me
+    })
+
+    // App aperta → solo suono soft (no banner: gestito dal SW se push arriva)
+    if (incomingFromOther && document.visibilityState === 'visible') {
+      playSoftChime()
+      void markMessagesRead(me!)
+      void clearUnreadBadge()
+      void syncBadgeWithServiceWorker(0)
+    }
+
     setNewMessageIds((prev) => {
       const next = new Set(prev)
       for (const id of fresh) next.add(id)
       return next
     })
-  }, [messages, loadingMessages])
+  }, [messages, loadingMessages, markMessagesRead])
 
   useEffect(() => {
     if (!profile) return

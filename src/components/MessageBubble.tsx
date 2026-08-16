@@ -11,7 +11,7 @@ interface MessageBubbleProps {
   onRetry?: (message: Message) => void
 }
 
-const TRANSLATION_TIMEOUT_MS = 20_000
+const TRANSLATION_TIMEOUT_MS = 12_000
 
 function formatTime(iso: string) {
   return new Date(iso).toLocaleTimeString([], {
