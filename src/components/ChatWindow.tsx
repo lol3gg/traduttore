@@ -16,6 +16,7 @@ import { translations } from '../i18n/translations'
 import type { Message, Profile } from '../types'
 import { Avatar } from './Avatar'
 import { MessageBubble } from './MessageBubble'
+import { InstallAppButton } from './InstallAppButton'
 import { OnlineStatus } from './OnlineStatus'
 
 function MessageSkeleton() {
@@ -207,7 +208,7 @@ export function ChatWindow() {
   return (
     <div className="flex h-[100dvh] max-w-[100vw] flex-col overflow-hidden bg-background text-slate-100">
       <div className="chat-scroll relative min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain">
-        <header className="safe-top sticky top-0 z-10 flex items-center gap-3 border-b border-border-subtle bg-surface/95 px-3 py-2.5 pr-14 backdrop-blur-md sm:px-4 sm:py-3">
+        <header className="safe-top sticky top-0 z-10 flex items-center gap-2 border-b border-border-subtle bg-surface/95 px-3 py-2.5 pr-16 backdrop-blur-md sm:gap-3 sm:px-4 sm:py-3 sm:pr-16">
           {otherProfile ? (
             <>
               <Avatar
@@ -227,6 +228,7 @@ export function ChatWindow() {
                   lang={profile.lang}
                 />
               </div>
+              <InstallAppButton variant="compact" lang={profile.lang} />
             </>
           ) : (
             <div className="flex items-center gap-3">

@@ -1,7 +1,6 @@
 import { ProfileProvider, useProfile } from './context/ProfileContext'
 import { ProfileSelector } from './components/ProfileSelector'
 import { ChatWindow } from './components/ChatWindow'
-import { InstallPrompt } from './components/InstallPrompt'
 import { PushPermissionDialog } from './components/PushPermissionDialog'
 
 function SwitchProfileButton() {
@@ -59,7 +58,6 @@ function AppContent() {
           <ChatWindow />
         </div>
       )}
-      <InstallPrompt />
     </>
   )
 }

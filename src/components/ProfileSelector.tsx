@@ -3,6 +3,7 @@ import { useProfile } from '../context/ProfileContext'
 import { supabase } from '../lib/supabase'
 import type { Profile } from '../types'
 import { Avatar } from './Avatar'
+import { InstallAppButton } from './InstallAppButton'
 
 export function ProfileSelector() {
   const { setProfile } = useProfile()
@@ -73,6 +74,20 @@ export function ProfileSelector() {
   return (
     <div className="flex min-h-svh flex-col items-center justify-center bg-background px-4">
       <div className="flex w-full max-w-md flex-col items-center gap-6">
+        <div className="flex flex-col items-center gap-3 text-center">
+          <img
+            src="/icon-192.png"
+            alt="Traduttore"
+            className="h-20 w-20 rounded-[1.25rem] shadow-xl ring-2 ring-white/10"
+          />
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight text-slate-50">
+              Traduttore
+            </h1>
+            <p className="mt-1 text-sm text-slate-400">Chat privata · IT ↔ RU</p>
+          </div>
+        </div>
+
         <div className="grid w-full grid-cols-1 gap-4 sm:grid-cols-2">
           {profiles.map((p) => (
             <button
@@ -96,6 +111,10 @@ export function ProfileSelector() {
           ))}
         </div>
         <p className="text-sm text-slate-500">Seleziona chi sei</p>
+
+        <div className="w-full pt-1">
+          <InstallAppButton variant="card" lang="it" />
+        </div>
       </div>
     </div>
   )

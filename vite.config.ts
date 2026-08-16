@@ -9,9 +9,9 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'icon-192.png', 'icon-512.png'],
       manifest: {
-        name: 'NomeApp',
-        short_name: 'NomeApp',
-        description: 'Chat privata con traduzione automatica',
+        name: 'Traduttore',
+        short_name: 'Traduttore',
+        description: 'Chat privata con traduzione IT ↔ RU',
         display: 'standalone',
         orientation: 'portrait',
         start_url: '/',
