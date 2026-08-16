@@ -15,6 +15,7 @@ export default defineConfig({
         'icon-512.png',
         'icon-192-maskable.png',
         'icon-512-maskable.png',
+        'apple-touch-icon.png',
       ],
       manifest: {
         name: 'Traduttore',
@@ -49,6 +50,12 @@ export default defineConfig({
             sizes: '512x512',
             type: 'image/png',
             purpose: 'maskable',
+          },
+          {
+            src: '/apple-touch-icon.png',
+            sizes: '180x180',
+            type: 'image/png',
+            purpose: 'any',
           },
         ],
       },

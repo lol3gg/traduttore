@@ -39,15 +39,11 @@ export function ProfileSelector() {
     }
   }, [])
 
-  function handleSelect(selected: Profile) {
-    setProfile(selected)
-  }
-
   if (loading) {
     return (
-      <div className="flex min-h-svh items-center justify-center">
+      <div className="flex h-[100dvh] items-center justify-center overflow-hidden">
         <div
-          className="h-10 w-10 animate-spin rounded-full border-2 border-white/10 border-t-sky-300"
+          className="h-9 w-9 animate-spin rounded-full border-2 border-white/10 border-t-sky-300"
           aria-label="Caricamento"
         />
       </div>
@@ -56,8 +52,8 @@ export function ProfileSelector() {
 
   if (error) {
     return (
-      <div className="flex min-h-svh items-center justify-center px-4">
-        <div className="glass-strong max-w-md space-y-3 rounded-[1.75rem] p-7 text-center">
+      <div className="flex h-[100dvh] items-center justify-center overflow-hidden px-5">
+        <div className="glass-strong w-full max-w-sm space-y-3 rounded-[1.5rem] p-6 text-center">
           <p className="text-sm text-red-300">{error}</p>
           <button
             type="button"
@@ -72,77 +68,75 @@ export function ProfileSelector() {
   }
 
   return (
-    <div className="flex min-h-svh flex-col items-center justify-center px-5 py-12">
-      <div className="flex w-full max-w-md animate-fade-rise flex-col items-center gap-10">
-        <div className="flex flex-col items-center gap-5 text-center">
-          <div className="relative">
+    <div className="flex h-[100dvh] max-h-[100dvh] flex-col overflow-hidden px-5 pb-[max(1rem,env(safe-area-inset-bottom))] pt-[max(1rem,env(safe-area-inset-top))]">
+      <div className="mx-auto flex h-full w-full max-w-md flex-col">
+        {/* Brand — compact hero */}
+        <header className="flex shrink-0 flex-col items-center pt-2 text-center">
+          <div className="relative mb-3">
             <div
-              className="absolute -inset-6 rounded-[2rem] opacity-70 blur-2xl animate-soft-pulse"
+              className="absolute -inset-4 rounded-[1.5rem] opacity-70 blur-xl"
               style={{
                 background:
-                  'radial-gradient(circle at 30% 30%, rgba(59,130,246,0.35), transparent 55%), radial-gradient(circle at 70% 70%, rgba(236,72,153,0.28), transparent 55%)',
+                  'radial-gradient(circle at 30% 30%, rgba(59,130,246,0.4), transparent 60%), radial-gradient(circle at 75% 70%, rgba(236,72,153,0.32), transparent 60%)',
               }}
             />
             <img
-              src="/icon-512.png"
+              src="/icon-512.png?v=3"
               alt=""
-              className="relative h-[6.25rem] w-[6.25rem] animate-icon-float rounded-[1.65rem] shadow-lift ring-1 ring-white/25"
+              className="relative h-[4.5rem] w-[4.5rem] rounded-[1.25rem] shadow-lift ring-1 ring-white/25"
             />
           </div>
+          <h1 className="font-display brand-mark text-[2.15rem] font-extrabold leading-none tracking-tight">
+            Traduttore
+          </h1>
+          <p className="mt-1.5 text-[13px] font-medium text-slate-400">
+            Italiano ↔ Russo · solo voi due
+          </p>
+        </header>
 
-          <div className="space-y-2">
-            <h1 className="font-display brand-mark text-[2.75rem] font-extrabold leading-none tracking-tight sm:text-5xl">
-              Traduttore
-            </h1>
-            <p className="text-[15px] font-medium tracking-wide text-slate-400">
-              Italiano ↔ Russo
-            </p>
-            <p className="text-sm text-slate-500">Chat privata · solo voi due</p>
+        {/* Profiles — fill middle, no scroll */}
+        <div className="flex min-h-0 flex-1 flex-col justify-center py-4">
+          <p className="mb-3 text-center text-[12px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+            Chi sei?
+          </p>
+          <div className="grid grid-cols-2 gap-3">
+            {profiles.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => setProfile(p)}
+                className="group relative flex flex-col items-center gap-2.5 overflow-hidden rounded-[1.35rem] px-3 py-5 text-center transition active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-400/50"
+              >
+                <span
+                  className="absolute inset-0"
+                  style={{
+                    background: `linear-gradient(165deg, ${p.theme_color}28, rgba(255,255,255,0.04) 50%, rgba(0,0,0,0.25))`,
+                  }}
+                />
+                <span className="absolute inset-0 rounded-[1.35rem] ring-1 ring-inset ring-white/12 transition group-active:ring-white/25" />
+                <span
+                  className="pointer-events-none absolute -right-5 -top-6 h-20 w-20 rounded-full opacity-45 blur-2xl"
+                  style={{ background: p.theme_color }}
+                />
+                <span className="relative">
+                  <Avatar name={p.name} themeColor={p.theme_color} size="md" />
+                </span>
+                <span className="relative font-display text-lg font-bold text-white">{p.name}</span>
+                <span
+                  className="relative text-[10px] font-semibold uppercase tracking-[0.16em]"
+                  style={{ color: p.theme_color }}
+                >
+                  {p.lang === 'it' ? 'Italiano' : 'Русский'}
+                </span>
+              </button>
+            ))}
           </div>
         </div>
 
-        <div className="grid w-full grid-cols-1 gap-3.5 sm:grid-cols-2">
-          {profiles.map((p, index) => (
-            <button
-              key={p.id}
-              type="button"
-              onClick={() => handleSelect(p)}
-              style={{ animationDelay: `${140 + index * 90}ms` }}
-              className="group animate-fade-rise relative flex flex-col items-center gap-3.5 overflow-hidden rounded-[1.75rem] px-5 py-7 text-center transition duration-300 hover:-translate-y-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-400/50"
-            >
-              <span
-                className="absolute inset-0 opacity-90 transition duration-300 group-hover:opacity-100"
-                style={{
-                  background: `linear-gradient(160deg, ${p.theme_color}22, rgba(255,255,255,0.04) 45%, rgba(0,0,0,0.2))`,
-                }}
-              />
-              <span className="absolute inset-0 rounded-[1.75rem] ring-1 ring-inset ring-white/10 transition group-hover:ring-white/20" />
-              <span
-                className="pointer-events-none absolute -right-6 -top-8 h-28 w-28 rounded-full opacity-40 blur-2xl transition duration-500 group-hover:opacity-70"
-                style={{ background: p.theme_color }}
-              />
-
-              <span className="relative">
-                <Avatar name={p.name} themeColor={p.theme_color} size="lg" />
-              </span>
-              <span className="relative font-display text-xl font-bold text-white">{p.name}</span>
-              <span
-                className="relative text-[11px] font-semibold uppercase tracking-[0.18em]"
-                style={{ color: p.theme_color }}
-              >
-                {p.lang === 'it' ? 'Italiano' : 'Русский'}
-              </span>
-            </button>
-          ))}
-        </div>
-
-        <p className="text-[13px] font-medium tracking-wide text-slate-500">
-          Tocca il tuo profilo per entrare
-        </p>
-
-        <div className="w-full">
+        {/* Install — compact footer, never pushes scroll */}
+        <footer className="shrink-0 pb-1">
           <InstallAppButton variant="card" lang="it" />
-        </div>
+        </footer>
       </div>
     </div>
   )

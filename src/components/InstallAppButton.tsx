@@ -49,10 +49,10 @@ export function InstallAppButton({
   const [open, setOpen] = useState(false)
   const t = copy[lang]
 
-  if (installed) {
+    if (installed) {
     if (variant === 'compact') return null
     return (
-      <div className="flex items-center justify-center gap-2 rounded-[1.25rem] border border-emerald-400/20 bg-emerald-400/[0.08] px-4 py-3 text-sm font-medium text-emerald-300">
+      <div className="flex items-center justify-center gap-2 rounded-[1.15rem] border border-emerald-400/20 bg-emerald-400/[0.08] px-3 py-2.5 text-[13px] font-medium text-emerald-300">
         <Smartphone className="h-4 w-4" />
         {t.installed}
       </div>
@@ -82,18 +82,18 @@ export function InstallAppButton({
       <button
         type="button"
         onClick={() => void handlePrimary()}
-        className="group flex w-full items-center gap-3.5 rounded-[1.5rem] border border-white/10 bg-white/[0.03] p-3.5 text-left transition hover:border-white/15 hover:bg-white/[0.05]"
+        className="group flex w-full items-center gap-3 rounded-[1.15rem] border border-white/10 bg-white/[0.03] px-3 py-2.5 text-left transition hover:border-white/15 hover:bg-white/[0.05] active:scale-[0.99]"
       >
         <img
-          src="/icon-512.png"
+          src="/icon-512.png?v=3"
           alt=""
-          className="h-12 w-12 rounded-[1.05rem] ring-1 ring-white/15"
+          className="h-10 w-10 rounded-[0.85rem] ring-1 ring-white/15"
         />
         <div className="min-w-0 flex-1">
-          <p className="font-display text-sm font-bold text-white">{t.title}</p>
-          <p className="mt-0.5 text-xs leading-relaxed text-slate-400">{t.subtitle}</p>
+          <p className="font-display text-[13px] font-bold text-white">{t.title}</p>
+          <p className="mt-0.5 truncate text-[11px] leading-snug text-slate-400">{t.subtitle}</p>
         </div>
-        <Download className="h-5 w-5 shrink-0 text-sky-300/90 transition group-hover:translate-x-0.5" />
+        <Download className="h-4 w-4 shrink-0 text-sky-300/90" />
       </button>
     ) : (
       <button
@@ -128,7 +128,7 @@ export function InstallAppButton({
                 <X className="h-4 w-4" />
               </button>
               <img
-                src="/icon-512.png"
+                src="/icon-512.png?v=3"
                 alt="Traduttore"
                 className="h-24 w-24 rounded-[1.4rem] shadow-lift ring-1 ring-white/15"
               />
