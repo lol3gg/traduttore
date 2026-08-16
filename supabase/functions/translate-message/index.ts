@@ -78,8 +78,36 @@ async function translateWithDeepL(
 }
 
 /**
- * Google Translate (unofficial gtx client) — reliable for it↔ru.
- * Used when DeepL is missing or fails.
+ * Lingva (Google front) — reliable for it↔ru from edge IPs.
+ * Google gtx often returns 429 from datacenter ranges.
+ */
+async function translateWithLingva(text: string, source: Lang, target: Lang): Promise<string> {
+  const hosts = [
+    'https://lingva.ml',
+    'https://lingva.garudalinux.org',
+    'https://translate.plausibly.com',
+  ]
+
+  let lastError: unknown
+  for (const host of hosts) {
+    try {
+      const url = `${host}/api/v1/${source}/${target}/${encodeURIComponent(text)}`
+      const res = await fetch(url)
+      if (!res.ok) throw new Error(`Lingva ${host} ${res.status}`)
+      const data = await res.json()
+      const translated = String(data?.translation ?? '').trim()
+      if (!translated) throw new Error(`Empty Lingva response from ${host}`)
+      return translated
+    } catch (err) {
+      lastError = err
+    }
+  }
+
+  throw lastError instanceof Error ? lastError : new Error('Lingva failed')
+}
+
+/**
+ * Google Translate (unofficial gtx client) — backup.
  */
 async function translateWithGoogle(text: string, source: Lang, target: Lang): Promise<string> {
   const url = new URL('https://translate.googleapis.com/translate_a/single')
@@ -175,6 +203,19 @@ Deno.serve(async (req: Request) => {
         }
       } catch (err) {
         errors.push(`DeepL: ${err instanceof Error ? err.message : String(err)}`)
+      }
+    }
+
+    if (!translatedText) {
+      try {
+        const candidate = await translateWithLingva(text, source_lang, target_lang)
+        if (isPlausibleTranslation(candidate, target_lang)) {
+          translatedText = candidate
+        } else {
+          errors.push(`Lingva implausible for ${target_lang}: ${candidate}`)
+        }
+      } catch (err) {
+        errors.push(`Lingva: ${err instanceof Error ? err.message : String(err)}`)
       }
     }
 
