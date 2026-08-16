@@ -6,7 +6,6 @@ import { themeGradient } from '../lib/color'
 interface MessageBubbleProps {
   message: Message
   profile: Profile
-  /** Theme color of the other person (used for their bubbles) */
   peerThemeColor?: string
   isNew?: boolean
   onRetry?: (message: Message) => void
@@ -77,24 +76,26 @@ export function MessageBubble({
               onClick={() => onRetry?.(message)}
               title="Riprova"
               aria-label="Riprova invio"
-              className="mb-1 shrink-0 rounded-full p-2 text-red-400 transition hover:bg-red-500/10 hover:text-red-300"
+              className="mb-1 shrink-0 rounded-full p-2 text-red-300 transition hover:bg-red-500/10"
             >
               <RotateCcw className="h-4 w-4" />
             </button>
           )}
 
           <div
-            className={`relative min-w-0 overflow-hidden shadow-md ${
-              imageSrc && !hasText ? 'rounded-2xl p-1' : 'rounded-2xl px-3.5 pb-5 pt-2'
+            className={`relative min-w-0 overflow-hidden shadow-bubble ${
+              imageSrc && !hasText
+                ? 'rounded-[1.35rem] p-1'
+                : 'rounded-[1.35rem] px-3.5 pb-5 pt-2.5'
             } ${
               isMine
-                ? `rounded-br-md text-white ${isFailed ? 'bg-red-900/80 ring-1 ring-red-500/50' : ''}`
+                ? `rounded-br-md text-white ${isFailed ? 'bg-red-950/90 ring-1 ring-red-500/40' : ''}`
                 : 'rounded-bl-md text-white'
             } ${isPending ? 'opacity-70' : ''}`}
             style={
               !isFailed && gradient && !(imageSrc && !hasText)
                 ? {
-                    backgroundImage: `linear-gradient(135deg, ${gradient.from}, ${gradient.to})`,
+                    backgroundImage: `linear-gradient(145deg, ${gradient.from}, ${gradient.to})`,
                   }
                 : !isFailed && imageSrc && !hasText
                   ? { backgroundColor: 'transparent' }
@@ -105,7 +106,7 @@ export function MessageBubble({
               <button
                 type="button"
                 onClick={() => setLightbox(true)}
-                className="block w-full overflow-hidden rounded-xl focus:outline-none"
+                className="block w-full overflow-hidden rounded-[1.1rem] focus:outline-none"
               >
                 <img
                   src={imageSrc}
@@ -118,7 +119,7 @@ export function MessageBubble({
 
             {hasText && (
               <p
-                className={`whitespace-pre-wrap break-words text-[15px] leading-relaxed ${
+                className={`whitespace-pre-wrap break-words text-[15px] font-medium leading-relaxed tracking-[0.01em] ${
                   imageSrc ? 'mt-2' : ''
                 }`}
               >
@@ -127,15 +128,17 @@ export function MessageBubble({
             )}
 
             {isTranslating && (
-              <p className="mt-1 text-[11px] italic text-white/70">traduzione in corso...</p>
+              <p className="mt-1.5 text-[11px] font-medium italic text-white/65">
+                traduzione in corso…
+              </p>
             )}
             {isFailed && (
-              <p className="mt-1 flex items-center gap-1 text-[11px] text-red-200">
+              <p className="mt-1.5 flex items-center gap-1 text-[11px] text-red-200">
                 <AlertCircle className="h-3 w-3" />
                 Invio non riuscito
               </p>
             )}
-            <span className="absolute bottom-1.5 right-2.5 text-[10px] text-white/70 sm:text-xs">
+            <span className="absolute bottom-1.5 right-3 text-[10px] font-medium tabular-nums text-white/60">
               {formatTime(message.created_at)}
             </span>
           </div>
@@ -144,7 +147,7 @@ export function MessageBubble({
 
       {lightbox && imageSrc && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-3"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/92 p-3 backdrop-blur-sm"
           onClick={() => setLightbox(false)}
           role="dialog"
           aria-modal="true"
@@ -160,7 +163,7 @@ export function MessageBubble({
           <img
             src={imageSrc}
             alt=""
-            className="max-h-[90dvh] max-w-full rounded-lg object-contain"
+            className="max-h-[90dvh] max-w-full rounded-2xl object-contain shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           />
         </div>

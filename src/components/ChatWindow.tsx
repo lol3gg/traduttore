@@ -21,15 +21,15 @@ import { OnlineStatus } from './OnlineStatus'
 
 function MessageSkeleton() {
   return (
-    <div className="space-y-3 px-1 py-2" aria-hidden="true">
+    <div className="space-y-4 px-1 py-2" aria-hidden="true">
       <div className="flex justify-start">
-        <div className="h-12 w-[55%] animate-pulse rounded-2xl rounded-bl-md bg-surface" />
+        <div className="h-12 w-[55%] animate-pulse rounded-[1.35rem] rounded-bl-md bg-white/5" />
       </div>
       <div className="flex justify-end">
-        <div className="h-10 w-[40%] animate-pulse rounded-2xl rounded-br-md bg-border-subtle/50" />
+        <div className="h-10 w-[42%] animate-pulse rounded-[1.35rem] rounded-br-md bg-white/[0.07]" />
       </div>
       <div className="flex justify-start">
-        <div className="h-14 w-[65%] animate-pulse rounded-2xl rounded-bl-md bg-surface" />
+        <div className="h-14 w-[62%] animate-pulse rounded-[1.35rem] rounded-bl-md bg-white/5" />
       </div>
     </div>
   )
@@ -206,9 +206,9 @@ export function ChatWindow() {
   }
 
   return (
-    <div className="flex h-[100dvh] max-w-[100vw] flex-col overflow-hidden bg-background text-slate-100">
+    <div className="flex h-[100dvh] max-w-[100vw] flex-col overflow-hidden text-slate-100">
       <div className="chat-scroll relative min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain">
-        <header className="safe-top sticky top-0 z-10 flex items-center gap-2 border-b border-border-subtle bg-surface/95 px-3 py-2.5 pr-16 backdrop-blur-md sm:gap-3 sm:px-4 sm:py-3 sm:pr-16">
+        <header className="safe-top sticky top-0 z-10 flex items-center gap-2 border-b border-white/5 bg-[rgba(7,11,20,0.72)] px-3 py-2.5 pr-16 backdrop-blur-xl sm:gap-3 sm:px-4 sm:py-3 sm:pr-16">
           {otherProfile ? (
             <>
               <Avatar
@@ -218,7 +218,7 @@ export function ChatWindow() {
                 isOnline={otherOnline}
               />
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium text-slate-100">
+                <p className="font-display truncate text-[15px] font-semibold tracking-tight text-slate-50">
                   {otherProfile.name}
                 </p>
                 <OnlineStatus
@@ -232,22 +232,24 @@ export function ChatWindow() {
             </>
           ) : (
             <div className="flex items-center gap-3">
-              <div className="h-10 w-10 animate-pulse rounded-full bg-border-subtle/40" />
-              <div className="h-8 w-28 animate-pulse rounded-lg bg-border-subtle/40" />
+              <div className="h-11 w-11 animate-pulse rounded-full bg-white/5" />
+              <div className="h-8 w-28 animate-pulse rounded-lg bg-white/5" />
             </div>
           )}
         </header>
 
-        <div className="space-y-3 px-3 py-3 pb-4 sm:px-4 sm:py-4">
+        <div className="space-y-3.5 px-3 py-4 pb-5 sm:px-4">
           {loadingMessages ? (
             <MessageSkeleton />
           ) : messages.length === 0 ? (
-            <div className="flex flex-col items-center justify-center px-4 py-16 text-center">
-              <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-surface text-2xl text-slate-500">
+            <div className="flex flex-col items-center justify-center px-4 py-20 text-center">
+              <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-blue-500/20 to-pink-500/15 text-2xl text-slate-300 ring-1 ring-white/10">
                 ✦
               </div>
-              <p className="text-base font-medium text-slate-200">{t.emptyTitle}</p>
-              <p className="mt-1 max-w-xs text-sm text-slate-500">{t.emptySubtitle}</p>
+              <p className="font-display text-lg font-semibold text-slate-100">{t.emptyTitle}</p>
+              <p className="mt-1.5 max-w-xs text-sm leading-relaxed text-slate-500">
+                {t.emptySubtitle}
+              </p>
             </div>
           ) : (
             messages.map((message) => (
@@ -265,20 +267,20 @@ export function ChatWindow() {
         </div>
       </div>
 
-      <div className="safe-bottom shrink-0 border-t border-border-subtle bg-surface">
+      <div className="safe-bottom shrink-0 border-t border-white/5 bg-[rgba(7,11,20,0.85)] backdrop-blur-xl">
         {imagePreview && (
-          <div className="flex items-center gap-2 px-3 pt-2">
+          <div className="flex items-center gap-2 px-3 pt-3">
             <div className="relative">
               <img
                 src={imagePreview}
                 alt=""
-                className="h-16 w-16 rounded-xl object-cover ring-1 ring-border-subtle"
+                className="h-16 w-16 rounded-2xl object-cover ring-1 ring-white/10"
               />
               <button
                 type="button"
                 onClick={clearImage}
                 aria-label={t.removePhoto}
-                className="absolute -right-1.5 -top-1.5 rounded-full bg-zinc-900 p-1 text-white ring-1 ring-border-subtle"
+                className="absolute -right-1.5 -top-1.5 rounded-full bg-zinc-900 p-1 text-white ring-1 ring-white/10"
               >
                 <X className="h-3 w-3" />
               </button>
@@ -288,7 +290,7 @@ export function ChatWindow() {
 
         <form
           onSubmit={handleSubmit}
-          className="flex items-end gap-2 px-3 py-2.5 sm:px-4 sm:py-3"
+          className="flex items-end gap-2 px-3 py-3 sm:px-4"
         >
           <input
             ref={fileInputRef}
@@ -303,9 +305,9 @@ export function ChatWindow() {
             type="button"
             onClick={() => fileInputRef.current?.click()}
             aria-label={t.addPhoto}
-            className="mb-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-slate-300 transition active:bg-border-subtle/60 hover:bg-border-subtle/40"
+            className="mb-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-slate-300 transition hover:bg-white/5 active:bg-white/10"
           >
-            <ImagePlus className="h-5 w-5" strokeWidth={2} />
+            <ImagePlus className="h-5 w-5" strokeWidth={1.75} />
           </button>
 
           <textarea
@@ -315,15 +317,17 @@ export function ChatWindow() {
             placeholder={t.placeholder}
             rows={1}
             enterKeyHint="send"
-            className="max-h-28 min-h-[44px] min-w-0 flex-1 resize-none rounded-2xl border border-border-subtle bg-slate-800/80 px-4 py-3 text-base leading-snug text-slate-100 placeholder:text-slate-500 outline-none transition focus:border-slate-500 sm:text-sm"
+            className="max-h-28 min-h-[46px] min-w-0 flex-1 resize-none rounded-[1.35rem] border border-white/10 bg-white/[0.04] px-4 py-3 text-base leading-snug text-slate-100 placeholder:text-slate-500 outline-none transition focus:border-sky-400/30 focus:bg-white/[0.06] sm:text-sm"
           />
 
           <button
             type="submit"
             disabled={!canSend}
             aria-label="Invia"
-            className="mb-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-white transition active:scale-95 hover:scale-105 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:scale-100"
-            style={{ backgroundColor: profile.theme_color }}
+            className="mb-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-white shadow-soft transition active:scale-95 hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:brightness-100"
+            style={{
+              backgroundImage: `linear-gradient(145deg, ${profile.theme_color}, ${profile.theme_color}cc)`,
+            }}
           >
             <Send className="h-4 w-4" strokeWidth={2} />
           </button>

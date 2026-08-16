@@ -14,7 +14,7 @@ export function OnlineStatus({ isOnline, isTyping, lastSeen, lang }: OnlineStatu
 
   if (isTyping) {
     return (
-      <div className="flex items-center gap-1.5 text-xs text-slate-400">
+      <div className="flex items-center gap-1.5 text-xs font-medium text-sky-300/90">
         <span>{t.typing}</span>
         <TypingIndicator />
       </div>
@@ -23,10 +23,10 @@ export function OnlineStatus({ isOnline, isTyping, lastSeen, lang }: OnlineStatu
 
   if (isOnline) {
     return (
-      <div className="flex items-center gap-1.5 text-xs text-slate-400">
+      <div className="flex items-center gap-1.5 text-xs font-medium text-emerald-400/90">
         <span className="relative flex h-2 w-2">
-          <span className="absolute inline-flex h-full w-full animate-pulse rounded-full bg-emerald-400 opacity-75" />
-          <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
+          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-40" />
+          <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400" />
         </span>
         <span>{t.online}</span>
       </div>

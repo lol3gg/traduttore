@@ -52,7 +52,7 @@ export function InstallAppButton({
   if (installed) {
     if (variant === 'compact') return null
     return (
-      <div className="flex items-center justify-center gap-2 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300">
+      <div className="flex items-center justify-center gap-2 rounded-2xl border border-emerald-400/20 bg-emerald-400/10 px-4 py-3 text-sm font-medium text-emerald-300">
         <Smartphone className="h-4 w-4" />
         {t.installed}
       </div>
@@ -82,24 +82,24 @@ export function InstallAppButton({
       <button
         type="button"
         onClick={() => void handlePrimary()}
-        className="group flex w-full items-center gap-3 rounded-2xl border border-border-subtle bg-surface/80 p-3 text-left transition hover:border-slate-500 hover:bg-surface"
+        className="group flex w-full items-center gap-3 rounded-3xl border border-white/10 bg-white/[0.03] p-3.5 text-left shadow-soft backdrop-blur-md transition hover:border-white/15 hover:bg-white/[0.05]"
       >
         <img
           src="/icon-192.png"
           alt=""
-          className="h-12 w-12 rounded-xl shadow-md ring-1 ring-white/10"
+          className="h-12 w-12 rounded-2xl shadow-md ring-1 ring-white/10"
         />
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-semibold text-slate-100">{t.title}</p>
-          <p className="mt-0.5 text-xs text-slate-400">{t.subtitle}</p>
+          <p className="font-display text-sm font-semibold text-slate-50">{t.title}</p>
+          <p className="mt-0.5 text-xs leading-relaxed text-slate-400">{t.subtitle}</p>
         </div>
-        <Download className="h-5 w-5 shrink-0 text-blue-400 transition group-hover:scale-110" />
+        <Download className="h-5 w-5 shrink-0 text-sky-300 transition group-hover:scale-110" />
       </button>
     ) : (
       <button
         type="button"
         onClick={() => void handlePrimary()}
-        className="flex w-full items-center justify-center gap-2 rounded-full bg-gradient-to-r from-blue-500 to-pink-500 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-500/20 transition hover:brightness-110 active:scale-[0.98]"
+        className="flex w-full items-center justify-center gap-2 rounded-full bg-gradient-to-r from-blue-500 to-pink-500 px-5 py-3.5 text-sm font-semibold text-white shadow-glow transition hover:brightness-110 active:scale-[0.98]"
       >
         <Download className="h-4 w-4" />
         {t.button}

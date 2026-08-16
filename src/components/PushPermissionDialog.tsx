@@ -52,29 +52,32 @@ export function PushPermissionDialog({ onSubscribed }: PushPermissionDialogProps
       aria-modal="true"
       aria-labelledby="push-enable-title"
     >
-      <div className="w-full max-w-sm rounded-2xl border border-border-subtle bg-surface p-5 shadow-xl">
-        <h2 id="push-enable-title" className="text-lg font-semibold text-slate-100">
+      <div className="w-full max-w-sm rounded-3xl border border-white/10 bg-surface-elevated/95 p-6 shadow-soft backdrop-blur-xl">
+        <h2
+          id="push-enable-title"
+          className="font-display text-xl font-semibold tracking-tight text-white"
+        >
           Attiva le notifiche
         </h2>
         <p className="mt-2 text-sm leading-relaxed text-slate-300">
           Ricevi un avviso quando arriva un messaggio anche se non sei nella chat.
         </p>
-        <p className="mt-2 text-xs text-slate-500">
+        <p className="mt-2 text-xs leading-relaxed text-slate-500">
           Su iPhone: aggiungi prima il sito alla Home Screen (iOS 16.4+), poi riapri l&apos;app
           dalla Home e attiva le notifiche.
         </p>
-        <div className="mt-4 flex flex-col gap-2">
+        <div className="mt-5 flex flex-col gap-2">
           <button
             type="button"
             onClick={() => void handleEnable()}
-            className="w-full rounded-full bg-blue-500 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-blue-400"
+            className="w-full rounded-full bg-gradient-to-r from-blue-500 to-sky-400 px-4 py-3 text-sm font-semibold text-white shadow-glow transition hover:brightness-110"
           >
             Attiva
           </button>
           <button
             type="button"
             onClick={handleLater}
-            className="w-full rounded-full px-4 py-2 text-sm text-slate-400 transition hover:text-slate-200"
+            className="w-full rounded-full px-4 py-2.5 text-sm text-slate-400 transition hover:text-slate-200"
           >
             Più tardi
           </button>

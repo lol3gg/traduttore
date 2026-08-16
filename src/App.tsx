@@ -12,7 +12,7 @@ function SwitchProfileButton() {
       onClick={() => setProfile(null)}
       title="Cambia profilo"
       aria-label="Cambia profilo"
-      className="safe-top absolute right-3 top-0 z-20 mt-3 rounded-lg p-2 text-slate-500 transition hover:bg-border-subtle/60 hover:text-slate-200 sm:right-4"
+      className="safe-top absolute right-3 top-0 z-20 mt-3 rounded-full p-2 text-slate-400 transition hover:bg-white/5 hover:text-slate-100 sm:right-4"
     >
       <svg
         xmlns="http://www.w3.org/2000/svg"
@@ -38,9 +38,9 @@ function AppContent() {
 
   if (loading) {
     return (
-      <div className="flex min-h-svh items-center justify-center bg-background">
+      <div className="flex min-h-svh items-center justify-center">
         <div
-          className="h-8 w-8 animate-spin rounded-full border-2 border-border-subtle border-t-slate-200"
+          className="h-9 w-9 animate-spin rounded-full border-2 border-border-subtle border-t-sky-300"
           aria-label="Caricamento"
         />
       </div>
