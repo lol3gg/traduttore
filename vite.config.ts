@@ -53,24 +53,18 @@ export default defineConfig({
         ],
       },
       workbox: {
-        // Avoid sticky broken HTML from older deploys; always refresh shell
         cleanupOutdatedCaches: true,
         clientsClaim: true,
         skipWaiting: true,
         importScripts: ['/push-handlers.js'],
+        // Do NOT precache HTML — stale shell + new hashed assets = blank app
         globPatterns: ['**/*.{js,css,ico,png,svg,woff2}'],
+        navigateFallback: null,
         runtimeCaching: [
           {
+            // Always fetch fresh HTML so asset hashes match the deploy
             urlPattern: ({ request }) => request.mode === 'navigate',
-            handler: 'NetworkFirst',
-            options: {
-              cacheName: 'pages-cache',
-              networkTimeoutSeconds: 3,
-              expiration: {
-                maxEntries: 5,
-                maxAgeSeconds: 60 * 60 * 24,
-              },
-            },
+            handler: 'NetworkOnly',
           },
           {
             urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,

@@ -1,13 +1,5 @@
 /* Handlers imported into the Workbox service worker for native Web Push */
 
-async function hasFocusedClient() {
-  const clients = await self.clients.matchAll({
-    type: 'window',
-    includeUncontrolled: true,
-  })
-  return clients.some((client) => client.focused)
-}
-
 self.addEventListener('push', (event) => {
   let data = {
     title: 'Nuovo messaggio',
@@ -47,7 +39,6 @@ self.addEventListener('push', (event) => {
       })
       const focused = clients.some((client) => client.focused)
 
-      // App aperta in primo piano → solo suono soft, niente banner
       if (focused) {
         for (const client of clients) {
           client.postMessage({
@@ -77,10 +68,16 @@ self.addEventListener('notificationclick', (event) => {
   const targetUrl = (event.notification.data && event.notification.data.url) || '/'
 
   event.waitUntil(
-    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
-      for (const client of clients) {
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+      for (const client of clientList) {
         if ('focus' in client) {
-          client.navigate(targetUrl)
+          try {
+            if (typeof client.navigate === 'function') {
+              client.navigate(targetUrl)
+            }
+          } catch {
+            /* ignore */
+          }
           return client.focus()
         }
       }

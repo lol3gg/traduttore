@@ -22,6 +22,60 @@
       rel="stylesheet"
     />
     <title>Traduttore</title>
+    <script>
+      /* Recover from stale PWA cache (blank screen after deploy) */
+      (function () {
+        var KEY = 'traduttore_sw_rescue'
+        function rescue() {
+          try {
+            if (sessionStorage.getItem(KEY) === '1') return
+            sessionStorage.setItem(KEY, '1')
+          } catch (e) {}
+          var done = function () {
+            try {
+              location.reload()
+            } catch (e) {}
+          }
+          if (!('serviceWorker' in navigator)) {
+            done()
+            return
+          }
+          navigator.serviceWorker
+            .getRegistrations()
+            .then(function (regs) {
+              return Promise.all(
+                regs.map(function (r) {
+                  return r.unregister()
+                }),
+              )
+            })
+            .then(function () {
+              if (window.caches && caches.keys) {
+                return caches.keys().then(function (keys) {
+                  return Promise.all(
+                    keys.map(function (k) {
+                      return caches.delete(k)
+                    }),
+                  )
+                })
+              }
+            })
+            .then(done)
+            .catch(done)
+        }
+        window.addEventListener(
+          'error',
+          function (e) {
+            var t = e && e.target
+            if (t && (t.tagName === 'SCRIPT' || t.tagName === 'LINK')) rescue()
+          },
+          true,
+        )
+        window.addEventListener('unhandledrejection', function () {
+          /* ignore — avoid aggressive reloads */
+        })
+      })()
+    </script>
   </head>
   <body>
     <div id="root"></div>
