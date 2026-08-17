@@ -4,7 +4,7 @@ import { translateClient } from '../lib/translateClient'
 import type { Lang, Message } from '../types'
 
 const MESSAGE_COLUMNS =
-  'id, sender_id, original_text, original_lang, translated_text, translated_lang, image_url, created_at, read_at'
+  'id, sender_id, original_text, original_lang, translated_text, translated_lang, image_url, created_at, read_at, edited_at, deleted_at'
 
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024
 
@@ -12,6 +12,8 @@ function asMessage(row: Message): Message {
   return {
     ...row,
     image_url: row.image_url ?? null,
+    edited_at: row.edited_at ?? null,
+    deleted_at: row.deleted_at ?? null,
     delivery_status: row.delivery_status ?? 'sent',
   }
 }
@@ -136,6 +138,7 @@ export function useMessages(viewerId?: string | null) {
           // Catch untranslated messages (e.g. after failed/slow prior invoke)
           const me = viewerIdRef.current
           for (const m of rows) {
+            if (m.deleted_at) continue
             if (!m.original_text?.trim() || m.translated_text) continue
             if (me && m.sender_id === me) continue
             requestTranslation(m.id, m.original_text, m.original_lang)
@@ -178,6 +181,7 @@ export function useMessages(viewerId?: string | null) {
           if (
             incoming.original_text?.trim() &&
             !incoming.translated_text &&
+            !incoming.deleted_at &&
             (!me || incoming.sender_id !== me)
           ) {
             requestTranslation(
@@ -288,7 +292,8 @@ export function useMessages(viewerId?: string | null) {
         (m) =>
           !m.id.startsWith('temp-') &&
           m.sender_id !== readerId &&
-          !m.read_at,
+          !m.read_at &&
+          !m.deleted_at,
       ).length,
     [messages],
   )
@@ -325,6 +330,8 @@ export function useMessages(viewerId?: string | null) {
         image_url: null,
         created_at: new Date().toISOString(),
         read_at: null,
+        edited_at: null,
+        deleted_at: null,
         delivery_status: 'pending',
         local_image_preview: localPreview,
       }
@@ -400,6 +407,85 @@ export function useMessages(viewerId?: string | null) {
     [invokeSideEffects],
   )
 
+  const editMessage = useCallback(
+    async (message: Message, nextText: string) => {
+      const trimmed = nextText.trim()
+      if (!trimmed || message.id.startsWith('temp-') || message.deleted_at) return
+      if (trimmed === message.original_text) return
+
+      const now = new Date().toISOString()
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === message.id
+            ? {
+                ...m,
+                original_text: trimmed,
+                translated_text: null,
+                translated_lang: null,
+                edited_at: now,
+              }
+            : m,
+        ),
+      )
+
+      const { error } = await supabase
+        .from('messages')
+        .update({
+          original_text: trimmed,
+          translated_text: null,
+          translated_lang: null,
+          edited_at: now,
+        })
+        .eq('id', message.id)
+
+      if (error) {
+        console.error('Failed to edit message:', error.message)
+        return
+      }
+
+      translatingIds.delete(message.id)
+      requestTranslation(message.id, trimmed, message.original_lang)
+    },
+    [requestTranslation],
+  )
+
+  const deleteMessage = useCallback(async (message: Message) => {
+    if (message.id.startsWith('temp-')) {
+      setMessages((prev) => prev.filter((m) => m.id !== message.id))
+      return
+    }
+
+    const now = new Date().toISOString()
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.id === message.id
+          ? {
+              ...m,
+              deleted_at: now,
+              original_text: '',
+              translated_text: null,
+              image_url: null,
+            }
+          : m,
+      ),
+    )
+
+    const { error } = await supabase
+      .from('messages')
+      .update({
+        deleted_at: now,
+        original_text: '',
+        translated_text: null,
+        translated_lang: null,
+        image_url: null,
+      })
+      .eq('id', message.id)
+
+    if (error) {
+      console.error('Failed to delete message:', error.message)
+    }
+  }, [])
+
   const retryMessage = useCallback(
     async (failed: Message, recipientId: string, senderName: string) => {
       if (failed.delivery_status !== 'failed') return
@@ -459,6 +545,8 @@ export function useMessages(viewerId?: string | null) {
     messages,
     sendMessage,
     retryMessage,
+    editMessage,
+    deleteMessage,
     loadingMessages,
     markMessagesRead,
     unreadCount,

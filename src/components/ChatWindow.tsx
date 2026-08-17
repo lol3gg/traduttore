@@ -6,7 +6,7 @@ import {
   type FormEvent,
   type KeyboardEvent,
 } from 'react'
-import { ImagePlus, Send, X } from 'lucide-react'
+import { Check, ImagePlus, Send, X } from 'lucide-react'
 import { useProfile } from '../context/ProfileContext'
 import { useMessages } from '../hooks/useMessages'
 import { usePresence } from '../hooks/usePresence'
@@ -54,6 +54,8 @@ export function ChatWindow() {
     messages,
     sendMessage,
     retryMessage,
+    editMessage,
+    deleteMessage,
     loadingMessages,
     markMessagesRead,
     unreadCount,
@@ -65,6 +67,7 @@ export function ChatWindow() {
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
   const [sending, setSending] = useState(false)
+  const [editing, setEditing] = useState<Message | null>(null)
   const [newMessageIds, setNewMessageIds] = useState<Set<string>>(() => new Set())
   const bottomRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -234,7 +237,9 @@ export function ChatWindow() {
   if (!profile) return null
 
   const t = translations[profile.lang]
-  const canSend = Boolean((text.trim() || imageFile) && otherProfile && !sending)
+  const canSend = editing
+    ? Boolean(text.trim() && !sending)
+    : Boolean((text.trim() || imageFile) && otherProfile && !sending)
 
   function clearImage() {
     if (imagePreview) URL.revokeObjectURL(imagePreview)
@@ -244,7 +249,21 @@ export function ChatWindow() {
   }
 
   async function handleSend() {
-    if (!profile || !otherProfile || (!text.trim() && !imageFile) || sending) return
+    if (!profile || sending) return
+
+    if (editing) {
+      if (!text.trim()) return
+      setSending(true)
+      const value = text
+      const target = editing
+      setText('')
+      setEditing(null)
+      await editMessage(target, value)
+      setSending(false)
+      return
+    }
+
+    if (!otherProfile || (!text.trim() && !imageFile)) return
 
     setSending(true)
     const value = text
@@ -258,6 +277,18 @@ export function ChatWindow() {
   function handleRetry(message: Message) {
     if (!otherProfile || !profile) return
     void retryMessage(message, otherProfile.id, profile.name)
+  }
+
+  function handleStartEdit(message: Message) {
+    if (!message.original_text?.trim()) return
+    setEditing(message)
+    setText(message.original_text)
+    clearImage()
+  }
+
+  function handleCancelEdit() {
+    setEditing(null)
+    setText('')
   }
 
   function handleSubmit(e: FormEvent) {
@@ -356,6 +387,8 @@ export function ChatWindow() {
                 peerThemeColor={otherProfile?.theme_color ?? '#EC4899'}
                 isNew={newMessageIds.has(message.id)}
                 onRetry={handleRetry}
+                onEdit={handleStartEdit}
+                onDelete={(m) => void deleteMessage(m)}
               />
             ))
           )}
@@ -364,7 +397,25 @@ export function ChatWindow() {
       </div>
 
       <div className="composer-shell safe-bottom shrink-0">
-        {imagePreview && (
+        {editing && (
+          <div className="flex items-center gap-2 border-b border-white/8 px-4 py-2">
+            <div className="min-w-0 flex-1">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-sky-300">
+                {t.editing}
+              </p>
+              <p className="truncate text-xs text-slate-400">{editing.original_text}</p>
+            </div>
+            <button
+              type="button"
+              onClick={handleCancelEdit}
+              aria-label={t.cancel}
+              className="rounded-full p-1.5 text-slate-400 hover:bg-white/[0.06] hover:text-white"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        )}
+        {imagePreview && !editing && (
           <div className="flex items-center gap-2 px-4 pt-3">
             <div className="relative">
               <img
@@ -397,14 +448,16 @@ export function ChatWindow() {
             onChange={handlePickImage}
           />
 
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            aria-label={t.addPhoto}
-            className="mb-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-slate-400 transition hover:bg-white/[0.06] hover:text-slate-200 active:scale-95"
-          >
-            <ImagePlus className="h-5 w-5" strokeWidth={1.75} />
-          </button>
+          {!editing && (
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              aria-label={t.addPhoto}
+              className="mb-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-slate-400 transition hover:bg-white/[0.06] hover:text-slate-200 active:scale-95"
+            >
+              <ImagePlus className="h-5 w-5" strokeWidth={1.75} />
+            </button>
+          )}
 
           <textarea
             value={text}
@@ -419,7 +472,7 @@ export function ChatWindow() {
           <button
             type="submit"
             disabled={!canSend}
-            aria-label="Invia"
+            aria-label={editing ? t.save : 'Invia'}
             className="mb-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-white transition active:scale-95 hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:brightness-100"
             style={{
               backgroundImage: `linear-gradient(145deg, ${profile.theme_color}, ${profile.theme_color}bb)`,
@@ -428,7 +481,11 @@ export function ChatWindow() {
                 : undefined,
             }}
           >
-            <Send className="h-4 w-4" strokeWidth={2.25} />
+            {editing ? (
+              <Check className="h-4 w-4" strokeWidth={2.25} />
+            ) : (
+              <Send className="h-4 w-4" strokeWidth={2.25} />
+            )}
           </button>
         </form>
       </div>

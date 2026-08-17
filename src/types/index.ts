@@ -24,6 +24,8 @@ export interface Message {
   image_url: string | null
   created_at: string
   read_at: string | null
+  edited_at: string | null
+  deleted_at: string | null
   /** Present only for optimistic / failed local rows */
   delivery_status?: MessageDeliveryStatus
   /** Local blob preview before upload finishes */
