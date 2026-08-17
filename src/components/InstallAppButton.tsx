@@ -18,7 +18,7 @@ const copy = {
     iosSteps: [
       'Tocca il pulsante Condividi in Safari',
       'Scorri e scegli “Aggiungi a Home”',
-      'Conferma — compare l’icona Traduttore',
+      'Conferma — compare l’icona Chatlook',
     ],
     androidHint: 'Si apre la finestra di installazione del browser.',
     close: 'Chiudi',
@@ -33,7 +33,7 @@ const copy = {
     iosSteps: [
       'Нажмите «Поделиться» в Safari',
       'Выберите «На экран «Домой»»',
-      'Подтвердите — появится иконка Traduttore',
+      'Подтвердите — появится иконка Chatlook',
     ],
     androidHint: 'Откроется окно установки браузера.',
     close: 'Закрыть',
@@ -129,14 +129,14 @@ export function InstallAppButton({
               </button>
               <img
                 src="/icon-512.png?v=3"
-                alt="Traduttore"
+                alt="Chatlook"
                 className="h-24 w-24 rounded-[1.4rem] shadow-lift ring-1 ring-white/15"
               />
               <h2
                 id="install-app-title"
                 className="font-display brand-mark mt-4 text-2xl font-extrabold"
               >
-                Traduttore
+                Chatlook
               </h2>
               <p className="mt-1 text-center text-sm text-slate-400">{t.subtitle}</p>
             </div>

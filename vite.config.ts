@@ -18,8 +18,8 @@ export default defineConfig({
         'apple-touch-icon.png',
       ],
       manifest: {
-        name: 'Traduttore',
-        short_name: 'Traduttore',
+        name: 'Chatlook',
+        short_name: 'Chatlook',
         description: 'Chat privata con traduzione IT ↔ RU',
         display: 'standalone',
         orientation: 'portrait',

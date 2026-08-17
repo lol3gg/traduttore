@@ -87,7 +87,7 @@ export function ProfileSelector() {
             />
           </div>
           <h1 className="font-display brand-mark text-[2.15rem] font-extrabold leading-none tracking-tight">
-            Traduttore
+            Chatlook
           </h1>
           <p className="mt-1.5 text-[13px] font-medium text-slate-400">
             Italiano ↔ Russo · solo voi due
