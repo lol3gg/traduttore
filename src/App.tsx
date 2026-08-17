@@ -1,4 +1,5 @@
 import { ProfileProvider, useProfile } from './context/ProfileContext'
+import { ThemeProvider } from './context/ThemeContext'
 import { ProfileSelector } from './components/ProfileSelector'
 import { ChatWindow } from './components/ChatWindow'
 import { PushPermissionDialog } from './components/PushPermissionDialog'
@@ -12,7 +13,7 @@ function SwitchProfileButton() {
       onClick={() => setProfile(null)}
       title="Cambia profilo"
       aria-label="Cambia profilo"
-      className="safe-top absolute right-3 top-0 z-20 mt-3 rounded-full p-2.5 text-slate-500 transition hover:bg-white/[0.06] hover:text-slate-100 sm:right-4"
+      className="safe-top absolute right-3 top-0 z-20 mt-3 rounded-full p-2.5 text-[var(--muted)] transition hover:bg-[var(--hover)] hover:text-[var(--text)] sm:right-4"
     >
       <svg
         xmlns="http://www.w3.org/2000/svg"
@@ -40,7 +41,7 @@ function AppContent() {
     return (
       <div className="flex min-h-svh items-center justify-center">
         <div
-          className="h-10 w-10 animate-spin rounded-full border-2 border-white/10 border-t-sky-300"
+          className="h-10 w-10 animate-spin rounded-full border-2 border-[var(--line)] border-t-sky-400"
           aria-label="Caricamento"
         />
       </div>
@@ -64,9 +65,11 @@ function AppContent() {
 
 function App() {
   return (
-    <ProfileProvider>
-      <AppContent />
-    </ProfileProvider>
+    <ThemeProvider>
+      <ProfileProvider>
+        <AppContent />
+      </ProfileProvider>
+    </ThemeProvider>
   )
 }
 

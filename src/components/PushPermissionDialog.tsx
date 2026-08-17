@@ -57,11 +57,11 @@ export function PushPermissionDialog({ onSubscribed }: PushPermissionDialogProps
         />
         <h2
           id="push-enable-title"
-          className="font-display text-xl font-bold tracking-tight text-white"
+          className="font-display text-xl font-bold tracking-tight text-[var(--text)]"
         >
           Attiva le notifiche
         </h2>
-        <p className="mt-2 text-sm leading-relaxed text-slate-300">
+        <p className="mt-2 text-sm leading-relaxed text-[var(--muted)]">
           Ricevi un avviso quando arriva un messaggio anche se non sei nella chat.
         </p>
         <p className="mt-2 text-xs leading-relaxed text-slate-500">
@@ -79,7 +79,7 @@ export function PushPermissionDialog({ onSubscribed }: PushPermissionDialogProps
           <button
             type="button"
             onClick={handleLater}
-            className="w-full rounded-[1.1rem] px-4 py-2.5 text-sm text-slate-400 transition hover:bg-white/[0.04] hover:text-slate-200"
+            className="w-full rounded-[1.1rem] px-4 py-2.5 text-sm text-[var(--muted)] transition hover:bg-[var(--hover)] hover:text-[var(--text)]"
           >
             Più tardi
           </button>

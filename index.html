@@ -23,6 +23,17 @@
     />
     <title>Chatlook</title>
     <script>
+      try {
+        var theme = localStorage.getItem('chatlook_theme')
+        if (theme === 'light') {
+          document.documentElement.classList.remove('dark')
+          document.documentElement.classList.add('light')
+          var meta = document.querySelector('meta[name="theme-color"]')
+          if (meta) meta.setAttribute('content', '#F3F5FA')
+        }
+      } catch (e) {}
+    </script>
+    <script>
       /* Recover from stale PWA cache (blank screen after deploy) */
       (function () {
         var KEY = 'traduttore_sw_rescue'

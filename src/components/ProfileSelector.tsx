@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase'
 import type { Profile } from '../types'
 import { Avatar } from './Avatar'
 import { InstallAppButton } from './InstallAppButton'
+import { ThemeToggle } from './ThemeToggle'
 
 export function ProfileSelector() {
   const { setProfile } = useProfile()
@@ -43,7 +44,7 @@ export function ProfileSelector() {
     return (
       <div className="flex h-[100dvh] items-center justify-center overflow-hidden">
         <div
-          className="h-9 w-9 animate-spin rounded-full border-2 border-white/10 border-t-sky-300"
+          className="h-9 w-9 animate-spin rounded-full border-2 border-[var(--line)] border-t-sky-400"
           aria-label="Caricamento"
         />
       </div>
@@ -54,11 +55,11 @@ export function ProfileSelector() {
     return (
       <div className="flex h-[100dvh] items-center justify-center overflow-hidden px-5">
         <div className="glass-strong w-full max-w-sm space-y-3 rounded-[1.5rem] p-6 text-center">
-          <p className="text-sm text-red-300">{error}</p>
+          <p className="text-sm text-red-400">{error}</p>
           <button
             type="button"
             onClick={() => window.location.reload()}
-            className="text-sm text-slate-400 underline decoration-white/20 underline-offset-4 hover:text-slate-200"
+            className="text-sm text-[var(--muted)] underline decoration-[var(--line-strong)] underline-offset-4 hover:text-[var(--text)]"
           >
             Riprova
           </button>
@@ -71,7 +72,10 @@ export function ProfileSelector() {
     <div className="flex h-[100dvh] max-h-[100dvh] flex-col overflow-hidden px-5 pb-[max(1rem,env(safe-area-inset-bottom))] pt-[max(1rem,env(safe-area-inset-top))]">
       <div className="mx-auto flex h-full w-full max-w-md flex-col">
         {/* Brand — compact hero */}
-        <header className="flex shrink-0 flex-col items-center pt-2 text-center">
+        <header className="relative flex shrink-0 flex-col items-center pt-2 text-center">
+          <div className="absolute right-0 top-0">
+            <ThemeToggle lang="it" />
+          </div>
           <div className="relative mb-3">
             <div
               className="absolute -inset-4 rounded-[1.5rem] opacity-70 blur-xl"
@@ -89,14 +93,14 @@ export function ProfileSelector() {
           <h1 className="font-display brand-mark text-[2.15rem] font-extrabold leading-none tracking-tight">
             Chatlook
           </h1>
-          <p className="mt-1.5 text-[13px] font-medium text-slate-400">
+          <p className="mt-1.5 text-[13px] font-medium text-[var(--muted)]">
             Italiano ↔ Russo · solo voi due
           </p>
         </header>
 
         {/* Profiles — fill middle, no scroll */}
         <div className="flex min-h-0 flex-1 flex-col justify-center py-4">
-          <p className="mb-3 text-center text-[12px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+          <p className="mb-3 text-center text-[12px] font-semibold uppercase tracking-[0.16em] text-[var(--muted)]">
             Chi sei?
           </p>
           <div className="grid grid-cols-2 gap-3">
@@ -110,7 +114,7 @@ export function ProfileSelector() {
                 <span
                   className="absolute inset-0"
                   style={{
-                    background: `linear-gradient(165deg, ${p.theme_color}28, rgba(255,255,255,0.04) 50%, rgba(0,0,0,0.25))`,
+                    background: `linear-gradient(165deg, ${p.theme_color}28, var(--input-bg) 50%, transparent)`,
                   }}
                 />
                 <span className="absolute inset-0 rounded-[1.35rem] ring-1 ring-inset ring-white/12 transition group-active:ring-white/25" />
@@ -121,7 +125,7 @@ export function ProfileSelector() {
                 <span className="relative">
                   <Avatar name={p.name} themeColor={p.theme_color} size="md" />
                 </span>
-                <span className="relative font-display text-lg font-bold text-white">{p.name}</span>
+                <span className="relative font-display text-lg font-bold text-[var(--text)]">{p.name}</span>
                 <span
                   className="relative text-[10px] font-semibold uppercase tracking-[0.16em]"
                   style={{ color: p.theme_color }}

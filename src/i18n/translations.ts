@@ -20,6 +20,8 @@ export const translations = {
     edited: 'modificato',
     deleteConfirm: 'Eliminare questo messaggio per entrambi?',
     deleteForEveryone: 'Elimina per tutti',
+    themeLight: 'Tema chiaro',
+    themeDark: 'Tema scuro',
   },
   ru: {
     placeholder: 'Напишите сообщение...',
@@ -42,6 +44,8 @@ export const translations = {
     edited: 'изменено',
     deleteConfirm: 'Удалить это сообщение у обоих?',
     deleteForEveryone: 'Удалить у всех',
+    themeLight: 'Светлая тема',
+    themeDark: 'Тёмная тема',
   },
 } as const
 

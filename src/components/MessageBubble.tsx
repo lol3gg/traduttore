@@ -110,8 +110,8 @@ export function MessageBubble({
   const meta = !isDeleted ? (
     <span
       className={`inline-flex items-center gap-1 text-[10px] font-medium tabular-nums ${
-        isMine ? 'text-white/55' : 'text-slate-400'
-      } ${imageOnly ? 'rounded-full bg-black/45 px-1.5 py-0.5 backdrop-blur-sm' : ''}`}
+        isMine ? 'text-white/55' : 'text-[var(--peer-meta)]'
+      } ${imageOnly ? 'rounded-full bg-black/45 px-1.5 py-0.5 backdrop-blur-sm text-white/80' : ''}`}
     >
       {message.edited_at && <span>{t.edited}</span>}
       <span>{formatTime(message.created_at)}</span>
@@ -163,7 +163,7 @@ export function MessageBubble({
                   : 'rounded-bl-md bg-white/[0.05] ring-1 ring-white/10'
                 : isMine
                   ? `bubble-mine rounded-br-md text-white ${isFailed ? 'bg-red-950/90 ring-1 ring-red-500/40' : ''}`
-                  : 'bubble-peer rounded-bl-md text-slate-50'
+                  : 'bubble-peer rounded-bl-md'
             } ${isPending ? 'opacity-70' : ''}`}
             style={
               isDeleted
@@ -192,7 +192,7 @@ export function MessageBubble({
             onClickCapture={handleClickCapture}
           >
             {isDeleted ? (
-              <p className="text-[14px] italic text-slate-400">{t.deleted}</p>
+              <p className="text-[14px] italic text-[var(--muted)]">{t.deleted}</p>
             ) : (
               <>
                 {imageSrc && (
@@ -217,7 +217,7 @@ export function MessageBubble({
                   <p
                     className={`whitespace-pre-wrap break-words text-[15px] font-medium leading-[1.45] tracking-[0.01em] ${
                       imageSrc ? 'mt-2' : ''
-                    } ${isMine ? 'text-white' : 'text-slate-50'}`}
+                    } ${isMine ? 'text-white' : 'text-[var(--peer-text)]'}`}
                   >
                     {displayText}
                   </p>
@@ -264,8 +264,8 @@ export function MessageBubble({
           >
             {confirmDelete ? (
               <div className="p-5">
-                <p className="font-display text-base font-bold text-white">{t.delete}</p>
-                <p className="mt-1.5 text-sm leading-relaxed text-slate-400">{t.deleteConfirm}</p>
+                <p className="font-display text-base font-bold text-[var(--text)]">{t.delete}</p>
+                <p className="mt-1.5 text-sm leading-relaxed text-[var(--muted)]">{t.deleteConfirm}</p>
                 <div className="mt-5 flex flex-col gap-2">
                   <button
                     type="button"
@@ -281,7 +281,7 @@ export function MessageBubble({
                   <button
                     type="button"
                     onClick={() => setConfirmDelete(false)}
-                    className="rounded-[1.05rem] px-4 py-2.5 text-sm text-slate-400"
+                    className="rounded-[1.05rem] px-4 py-2.5 text-sm text-[var(--muted)]"
                   >
                     {t.cancel}
                   </button>
@@ -296,7 +296,7 @@ export function MessageBubble({
                       setMenuOpen(false)
                       onEdit?.(message)
                     }}
-                    className="flex w-full items-center gap-3 px-5 py-3.5 text-left text-[15px] font-medium text-white transition hover:bg-white/[0.05]"
+                    className="flex w-full items-center gap-3 px-5 py-3.5 text-left text-[15px] font-medium text-[var(--text)] transition hover:bg-[var(--hover)]"
                   >
                     <Pencil className="h-4 w-4 text-sky-300" />
                     {t.edit}
@@ -305,7 +305,7 @@ export function MessageBubble({
                 <button
                   type="button"
                   onClick={() => setConfirmDelete(true)}
-                  className="flex w-full items-center gap-3 px-5 py-3.5 text-left text-[15px] font-medium text-red-300 transition hover:bg-white/[0.05]"
+                  className="flex w-full items-center gap-3 px-5 py-3.5 text-left text-[15px] font-medium text-red-400 transition hover:bg-[var(--hover)]"
                 >
                   <Trash2 className="h-4 w-4" />
                   {t.delete}
@@ -313,7 +313,7 @@ export function MessageBubble({
                 <button
                   type="button"
                   onClick={() => setMenuOpen(false)}
-                  className="flex w-full items-center gap-3 px-5 py-3.5 text-left text-[15px] text-slate-400"
+                  className="flex w-full items-center gap-3 px-5 py-3.5 text-left text-[15px] text-[var(--muted)]"
                 >
                   {t.cancel}
                 </button>

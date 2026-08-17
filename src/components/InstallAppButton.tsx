@@ -74,7 +74,7 @@ export function InstallAppButton({
         onClick={() => void handlePrimary()}
         title={t.title}
         aria-label={t.title}
-        className="flex h-9 w-9 items-center justify-center rounded-full text-slate-400 transition hover:bg-white/[0.06] hover:text-white"
+        className="flex h-9 w-9 items-center justify-center rounded-full text-[var(--muted)] transition hover:bg-[var(--hover)] hover:text-[var(--text)]"
       >
         <Download className="h-4 w-4" strokeWidth={2} />
       </button>
@@ -82,16 +82,16 @@ export function InstallAppButton({
       <button
         type="button"
         onClick={() => void handlePrimary()}
-        className="group flex w-full items-center gap-3 rounded-[1.15rem] border border-white/10 bg-white/[0.03] px-3 py-2.5 text-left transition hover:border-white/15 hover:bg-white/[0.05] active:scale-[0.99]"
+        className="group flex w-full items-center gap-3 rounded-[1.15rem] border border-[var(--line)] bg-[var(--input-bg)] px-3 py-2.5 text-left transition hover:border-[var(--line-strong)] hover:bg-[var(--hover)] active:scale-[0.99]"
       >
         <img
           src="/icon-512.png?v=3"
           alt=""
-          className="h-10 w-10 rounded-[0.85rem] ring-1 ring-white/15"
+          className="h-10 w-10 rounded-[0.85rem] ring-1 ring-[var(--line)]"
         />
         <div className="min-w-0 flex-1">
-          <p className="font-display text-[13px] font-bold text-white">{t.title}</p>
-          <p className="mt-0.5 truncate text-[11px] leading-snug text-slate-400">{t.subtitle}</p>
+          <p className="font-display text-[13px] font-bold text-[var(--text)]">{t.title}</p>
+          <p className="mt-0.5 truncate text-[11px] leading-snug text-[var(--muted)]">{t.subtitle}</p>
         </div>
         <Download className="h-4 w-4 shrink-0 text-sky-300/90" />
       </button>

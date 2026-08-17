@@ -20,6 +20,7 @@ import { Avatar } from './Avatar'
 import { MessageBubble } from './MessageBubble'
 import { InstallAppButton } from './InstallAppButton'
 import { OnlineStatus } from './OnlineStatus'
+import { ThemeToggle } from './ThemeToggle'
 
 async function syncBadgeWithServiceWorker(count: number) {
   try {
@@ -36,13 +37,13 @@ function MessageSkeleton() {
   return (
     <div className="space-y-4 px-1 py-2" aria-hidden="true">
       <div className="flex justify-start">
-        <div className="h-12 w-[55%] animate-pulse rounded-[1.4rem] rounded-bl-md bg-white/[0.04]" />
+          className="h-12 w-[55%] animate-pulse rounded-[1.4rem] rounded-bl-md bg-[var(--hover)]"
       </div>
       <div className="flex justify-end">
-        <div className="h-10 w-[42%] animate-pulse rounded-[1.4rem] rounded-br-md bg-white/[0.06]" />
+        <div className="h-10 w-[42%] animate-pulse rounded-[1.4rem] rounded-br-md bg-[var(--hover)]" />
       </div>
       <div className="flex justify-start">
-        <div className="h-14 w-[62%] animate-pulse rounded-[1.4rem] rounded-bl-md bg-white/[0.04]" />
+        <div className="h-14 w-[62%] animate-pulse rounded-[1.4rem] rounded-bl-md bg-[var(--hover)]" />
       </div>
     </div>
   )
@@ -319,7 +320,7 @@ export function ChatWindow() {
   }
 
   return (
-    <div className="flex h-[100dvh] max-w-[100vw] flex-col overflow-hidden text-slate-100">
+    <div className="flex h-[100dvh] max-w-[100vw] flex-col overflow-hidden text-[var(--text)]">
       <div className="chat-scroll relative min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain">
         <header className="header-shell safe-top sticky top-0 z-10 flex items-center gap-2.5 px-3 py-3 pr-16 sm:gap-3 sm:px-4 sm:pr-16">
           {otherProfile ? (
@@ -331,7 +332,7 @@ export function ChatWindow() {
                 isOnline={otherOnline}
               />
               <div className="min-w-0 flex-1">
-                <p className="font-display truncate text-[16px] font-bold tracking-tight text-white">
+                <p className="font-display truncate text-[16px] font-bold tracking-tight text-[var(--text)]">
                   {otherProfile.name}
                 </p>
                 <OnlineStatus
@@ -341,6 +342,7 @@ export function ChatWindow() {
                   lang={profile.lang}
                 />
               </div>
+              <ThemeToggle lang={profile.lang} />
               <InstallAppButton variant="compact" lang={profile.lang} />
             </>
           ) : (
@@ -373,8 +375,8 @@ export function ChatWindow() {
                   />
                 </div>
               </div>
-              <p className="font-display text-xl font-bold text-white">{t.emptyTitle}</p>
-              <p className="mt-2 max-w-xs text-sm leading-relaxed text-slate-500">
+              <p className="font-display text-xl font-bold text-[var(--text)]">{t.emptyTitle}</p>
+              <p className="mt-2 max-w-xs text-sm leading-relaxed text-[var(--muted)]">
                 {t.emptySubtitle}
               </p>
             </div>
@@ -403,13 +405,13 @@ export function ChatWindow() {
               <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-sky-300">
                 {t.editing}
               </p>
-              <p className="truncate text-xs text-slate-400">{editing.original_text}</p>
+              <p className="truncate text-xs text-[var(--muted)]">{editing.original_text}</p>
             </div>
             <button
               type="button"
               onClick={handleCancelEdit}
               aria-label={t.cancel}
-              className="rounded-full p-1.5 text-slate-400 hover:bg-white/[0.06] hover:text-white"
+              className="rounded-full p-1.5 text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)]"
             >
               <X className="h-4 w-4" />
             </button>
@@ -453,7 +455,7 @@ export function ChatWindow() {
               type="button"
               onClick={() => fileInputRef.current?.click()}
               aria-label={t.addPhoto}
-              className="mb-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-slate-400 transition hover:bg-white/[0.06] hover:text-slate-200 active:scale-95"
+              className="mb-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-[var(--muted)] transition hover:bg-[var(--hover)] hover:text-[var(--text)] active:scale-95"
             >
               <ImagePlus className="h-5 w-5" strokeWidth={1.75} />
             </button>
@@ -466,7 +468,7 @@ export function ChatWindow() {
             placeholder={t.placeholder}
             rows={1}
             enterKeyHint="send"
-            className="max-h-28 min-h-[46px] min-w-0 flex-1 resize-none rounded-[1.4rem] border border-white/10 bg-white/[0.045] px-4 py-3 text-base leading-snug text-slate-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] placeholder:text-slate-500 outline-none transition focus:border-white/20 focus:bg-white/[0.07] sm:text-sm"
+            className="composer-input max-h-28 min-h-[46px] min-w-0 flex-1 resize-none rounded-[1.4rem] px-4 py-3 text-base leading-snug outline-none transition focus:border-[var(--line-strong)] sm:text-sm"
           />
 
           <button
