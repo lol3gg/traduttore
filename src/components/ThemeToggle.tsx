@@ -18,7 +18,7 @@ export function ThemeToggle({ lang = 'it' }: ThemeToggleProps) {
       onClick={toggleTheme}
       title={label}
       aria-label={label}
-      className="flex h-9 w-9 items-center justify-center rounded-full text-[var(--muted)] transition hover:bg-[var(--hover)] hover:text-[var(--text)]"
+      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[var(--muted)] transition hover:bg-[var(--hover)] hover:text-[var(--text)]"
     >
       {isLight ? <Moon className="h-4 w-4" strokeWidth={2} /> : <Sun className="h-4 w-4" strokeWidth={2} />}
     </button>

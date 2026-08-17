@@ -11,6 +11,9 @@ export const translations = {
     emptySubtitle: 'Il primo messaggio apparirà qui.',
     addPhoto: 'Aggiungi foto',
     removePhoto: 'Rimuovi foto',
+    photo: 'Foto',
+    tapToView: 'Tocca per vedere',
+    loadOlder: 'Messaggi precedenti',
     edit: 'Modifica',
     delete: 'Elimina',
     cancel: 'Annulla',
@@ -22,6 +25,17 @@ export const translations = {
     deleteForEveryone: 'Elimina per tutti',
     themeLight: 'Tema chiaro',
     themeDark: 'Tema scuro',
+    translating: 'traduzione in corso…',
+    sendFailed: 'Invio non riuscito',
+    pushDialogTitle: 'Attiva le notifiche',
+    pushDialogBody:
+      'Ricevi un avviso quando arriva un messaggio anche se non sei nella chat.',
+    pushDialogIosHint:
+      "Su iPhone: aggiungi prima il sito alla Home Screen (iOS 16.4+), poi riapri l'app dalla Home e attiva le notifiche.",
+    pushDialogEnable: 'Attiva',
+    pushDialogLater: 'Più tardi',
+    connectionLost: 'Connessione assente, riconnessione in corso...',
+    exportChat: 'Esporta conversazione',
   },
   ru: {
     placeholder: 'Напишите сообщение...',
@@ -35,6 +49,9 @@ export const translations = {
     emptySubtitle: 'Первое сообщение появится здесь.',
     addPhoto: 'Добавить фото',
     removePhoto: 'Удалить фото',
+    photo: 'Фото',
+    tapToView: 'Нажмите, чтобы открыть',
+    loadOlder: 'Предыдущие сообщения',
     edit: 'Изменить',
     delete: 'Удалить',
     cancel: 'Отмена',
@@ -46,6 +63,17 @@ export const translations = {
     deleteForEveryone: 'Удалить у всех',
     themeLight: 'Светлая тема',
     themeDark: 'Тёмная тема',
+    translating: 'перевод…',
+    sendFailed: 'Не удалось отправить',
+    pushDialogTitle: 'Включить уведомления',
+    pushDialogBody:
+      'Получайте уведомление о новом сообщении, даже если чат закрыт.',
+    pushDialogIosHint:
+      'На iPhone: сначала добавьте сайт на главный экран (iOS 16.4+), затем откройте приложение оттуда и включите уведомления.',
+    pushDialogEnable: 'Включить',
+    pushDialogLater: 'Позже',
+    connectionLost: 'Нет соединения, переподключение...',
+    exportChat: 'Экспортировать переписку',
   },
 } as const
 

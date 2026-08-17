@@ -1,6 +1,6 @@
-# NomeApp
+# Chatlook
 
-Chat privata tra due persone con traduzione automatica (IT ↔ RU), presence in tempo reale, PWA installabile e notifiche push OneSignal.
+Chat privata tra due persone con traduzione automatica (IT ↔ RU), presence in tempo reale, PWA installabile e notifiche Web Push native.
 
 ## Stack
 
@@ -8,20 +8,20 @@ Chat privata tra due persone con traduzione automatica (IT ↔ RU), presence in 
 - Supabase (Realtime, Edge Functions)
 - DeepL (traduzione via Edge Function)
 - PWA (`vite-plugin-pwa`)
-- OneSignal (Web Push)
+- Web Push nativo (VAPID)
 
 ## Setup locale
 
 1. Copia `.env.example` in `.env` e inserisci:
    - `VITE_SUPABASE_URL`
    - `VITE_SUPABASE_ANON_KEY`
-   - `VITE_ONESIGNAL_APP_ID`
+   - `VITE_VAPID_PUBLIC_KEY`
 2. Esegui gli schema SQL in `supabase/migrations/` sul progetto Supabase:
    - `001_init.sql` (tabelle + seed)
    - `002_rls.sql` (policy permissive per anon key senza Auth)
 3. Deploya le Edge Function e imposta i secrets:
    - `translate-message` → `DEEPL_API_KEY`
-   - `send-notification` → `ONESIGNAL_APP_ID`, `ONESIGNAL_REST_API_KEY`, `APP_URL`
+   - `send-notification` → `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`, `APP_URL`
 4. Avvia:
 
 ```bash
@@ -55,26 +55,29 @@ Poi sostituisci i PNG con le tue icone custom (mantieni gli stessi nomi file).
 3. Imposta le Environment Variables:
    - `VITE_SUPABASE_URL`
    - `VITE_SUPABASE_ANON_KEY`
-   - `VITE_ONESIGNAL_APP_ID`
+   - `VITE_VAPID_PUBLIC_KEY`
 4. Framework preset: **Vite** (build command `npm run build`, output `dist`).
-5. Deploy. Usa HTTPS (obbligatorio per PWA, OneSignal e installazione).
+5. Deploy. Usa HTTPS (obbligatorio per PWA, Web Push e installazione).
 
 Dopo ogni redeploy, grazie a `registerType: 'autoUpdate'`, riaprendo l’app lo shell si aggiorna da solo.
 
-## OneSignal (notifiche push)
+## Notifiche push (Web Push nativo)
 
-1. Crea un’app **Web Push** su OneSignal (Typical Site / Custom Code).
-2. Copia **App ID** → `VITE_ONESIGNAL_APP_ID` (Vercel + `.env`) e secret `ONESIGNAL_APP_ID`.
-3. Copia **REST API Key** → secret Supabase `ONESIGNAL_REST_API_KEY`.
-4. Imposta `APP_URL` (URL pubblico dell’app, es. `https://nomeapp.vercel.app`) come secret della function `send-notification`.
-5. Deploy:
+1. Genera una coppia VAPID (`npx web-push generate-vapid-keys`).
+2. Imposta la chiave pubblica come `VITE_VAPID_PUBLIC_KEY` (Vercel + `.env`).
+3. Imposta i secret della Edge Function `send-notification`:
+   - `VAPID_PUBLIC_KEY`
+   - `VAPID_PRIVATE_KEY`
+   - `VAPID_SUBJECT` (es. `mailto:tuaemail@esempio.com`)
+   - `APP_URL` (URL pubblico dell’app, es. `https://nomeapp.vercel.app`)
+4. Deploy:
 
 ```bash
 supabase functions deploy send-notification
-supabase secrets set ONESIGNAL_APP_ID=... ONESIGNAL_REST_API_KEY=... APP_URL=https://...
+supabase secrets set VAPID_PUBLIC_KEY=... VAPID_PRIVATE_KEY=... VAPID_SUBJECT=mailto:... APP_URL=https://...
 ```
 
-Dopo la selezione del profilo, l’app chiede il permesso notifiche e salva `onesignal_player_id` su `profiles`.
+Dopo la selezione del profilo, l’app chiede il permesso notifiche e salva `push_subscription` su `profiles`.
 
 ### iOS
 
@@ -99,4 +102,8 @@ Le push su iOS 16.4+ funzionano **solo** se l’app è aggiunta alla Home Screen
 ## Note
 
 - L’app richiede connessione (Supabase Realtime): la cache PWA serve lo shell, non un uso offline completo.
-- Se l’utente rifiuta le notifiche, la chat resta usabile: `onesignal_player_id` resta `null` e non riceve push.
+- Se l’utente rifiuta le notifiche, la chat resta usabile: `push_subscription` resta `null` e non riceve push.
+
+## Sicurezza VAPID
+
+Le vecchie chiavi VAPID committate nel codice sono da considerarsi compromesse. Devi generare una nuova coppia VAPID (es. con `npx web-push generate-vapid-keys` oppure tramite un tool online affidabile) e impostarle come secret su Supabase (Edge Functions → Secrets) e come env var su Vercel, poi tutti gli utenti dovranno ri-autorizzare le notifiche push perché le subscription vecchie non saranno più valide con la nuova chiave.

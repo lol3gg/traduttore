@@ -4,36 +4,6 @@ import { ProfileSelector } from './components/ProfileSelector'
 import { ChatWindow } from './components/ChatWindow'
 import { PushPermissionDialog } from './components/PushPermissionDialog'
 
-function SwitchProfileButton() {
-  const { setProfile } = useProfile()
-
-  return (
-    <button
-      type="button"
-      onClick={() => setProfile(null)}
-      title="Cambia profilo"
-      aria-label="Cambia profilo"
-      className="safe-top absolute right-3 top-0 z-20 mt-3 rounded-full p-2.5 text-[var(--muted)] transition hover:bg-[var(--hover)] hover:text-[var(--text)] sm:right-4"
-    >
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.75"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        className="h-5 w-5"
-        aria-hidden="true"
-      >
-        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-        <polyline points="16 17 21 12 16 7" />
-        <line x1="21" y1="12" x2="9" y2="12" />
-      </svg>
-    </button>
-  )
-}
-
 function AppContent() {
   const { profile, loading, savePushSubscription } = useProfile()
 
@@ -50,14 +20,16 @@ function AppContent() {
 
   return (
     <>
-      <PushPermissionDialog onSubscribed={(sub) => void savePushSubscription(sub)} />
       {!profile ? (
         <ProfileSelector />
       ) : (
-        <div className="relative bg-transparent">
-          <SwitchProfileButton />
+        <>
+          <PushPermissionDialog
+            lang={profile.lang}
+            onSubscribed={(sub) => void savePushSubscription(sub)}
+          />
           <ChatWindow />
-        </div>
+        </>
       )}
     </>
   )

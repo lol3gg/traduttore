@@ -1,16 +1,19 @@
 import {
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type ChangeEvent,
   type FormEvent,
   type KeyboardEvent,
+  type UIEvent,
 } from 'react'
-import { Check, ImagePlus, Send, X } from 'lucide-react'
+import { Check, ImagePlus, LogOut, Send, X } from 'lucide-react'
 import { useProfile } from '../context/ProfileContext'
 import { useMessages } from '../hooks/useMessages'
 import { usePresence } from '../hooks/usePresence'
 import { useTyping } from '../hooks/useTyping'
+import { useReactions } from '../hooks/useReactions'
 import { clearUnreadBadge, setUnreadBadge } from '../lib/appBadge'
 import { playSoftChime } from '../lib/softChime'
 import { supabase } from '../lib/supabase'
@@ -18,6 +21,8 @@ import { translations } from '../i18n/translations'
 import type { Message, Profile } from '../types'
 import { Avatar } from './Avatar'
 import { MessageBubble } from './MessageBubble'
+import { ConnectionBanner } from './ConnectionBanner'
+import { ExportButton } from './ExportButton'
 import { InstallAppButton } from './InstallAppButton'
 import { OnlineStatus } from './OnlineStatus'
 import { ThemeToggle } from './ThemeToggle'
@@ -37,7 +42,7 @@ function MessageSkeleton() {
   return (
     <div className="space-y-4 px-1 py-2" aria-hidden="true">
       <div className="flex justify-start">
-          className="h-12 w-[55%] animate-pulse rounded-[1.4rem] rounded-bl-md bg-[var(--hover)]"
+        <div className="h-12 w-[55%] animate-pulse rounded-[1.4rem] rounded-bl-md bg-[var(--hover)]" />
       </div>
       <div className="flex justify-end">
         <div className="h-10 w-[42%] animate-pulse rounded-[1.4rem] rounded-br-md bg-[var(--hover)]" />
@@ -50,7 +55,7 @@ function MessageSkeleton() {
 }
 
 export function ChatWindow() {
-  const { profile } = useProfile()
+  const { profile, setProfile } = useProfile()
   const {
     messages,
     sendMessage,
@@ -60,9 +65,14 @@ export function ChatWindow() {
     loadingMessages,
     markMessagesRead,
     unreadCount,
+    loadOlder,
+    hasOlder,
+    loadingOlder,
+    refreshLatest,
   } = useMessages(profile?.id)
-  const { onlineStatus } = usePresence(profile)
+  const { isOnline, lastSeenOf } = usePresence(profile)
   const { typingStatus, notifyTyping, clearTypingFor } = useTyping(profile)
+  const { reactionsByMessage, toggleReaction } = useReactions()
   const [otherProfile, setOtherProfile] = useState<Profile | null>(null)
   const [text, setText] = useState('')
   const [imageFile, setImageFile] = useState<File | null>(null)
@@ -71,27 +81,59 @@ export function ChatWindow() {
   const [editing, setEditing] = useState<Message | null>(null)
   const [newMessageIds, setNewMessageIds] = useState<Set<string>>(() => new Set())
   const bottomRef = useRef<HTMLDivElement>(null)
+  const scrollRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const seededIdsRef = useRef(false)
   const knownIdsRef = useRef<Set<string>>(new Set())
   const wasOtherOnlineRef = useRef(false)
   const profileIdRef = useRef(profile?.id)
+  const stickToBottomRef = useRef(true)
+  const didInitialScrollRef = useRef(false)
+  const olderPinRef = useRef<{ height: number; top: number } | null>(null)
   profileIdRef.current = profile?.id
 
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages, imagePreview])
+  useLayoutEffect(() => {
+    const el = scrollRef.current
+    if (!el || loadingMessages) return
 
-  // Soft chime from service worker when push arrives with app focused
+    const pin = olderPinRef.current
+    if (pin) {
+      el.scrollTop = el.scrollHeight - pin.height + pin.top
+      olderPinRef.current = null
+      return
+    }
+
+    if (!didInitialScrollRef.current) {
+      if (messages.length === 0) return
+      el.scrollTop = el.scrollHeight
+      didInitialScrollRef.current = true
+      stickToBottomRef.current = true
+      return
+    }
+
+    if (stickToBottomRef.current) {
+      el.scrollTop = el.scrollHeight
+    }
+  }, [messages, loadingMessages, imagePreview])
+
+  // Soft chime + open from notification without reloading the app
   useEffect(() => {
     function onSwMessage(event: MessageEvent) {
       if (event.data?.type === 'soft-chime') {
         playSoftChime()
+        return
+      }
+      if (event.data?.type === 'open-from-notification') {
+        stickToBottomRef.current = true
+        didInitialScrollRef.current = true
+        void refreshLatest()
+        const el = scrollRef.current
+        if (el) el.scrollTop = el.scrollHeight
       }
     }
     navigator.serviceWorker?.addEventListener('message', onSwMessage)
     return () => navigator.serviceWorker?.removeEventListener('message', onSwMessage)
-  }, [])
+  }, [refreshLatest])
 
   // Mark read + clear home-screen badge while chat is open/visible
   useEffect(() => {
@@ -223,8 +265,11 @@ export function ChatWindow() {
     }
   }, [imagePreview])
 
-  const otherOnline = otherProfile ? Boolean(onlineStatus[otherProfile.id]) : false
+  const otherOnline = otherProfile ? isOnline(otherProfile.id) : false
   const otherTyping = otherProfile ? Boolean(typingStatus[otherProfile.id]) : false
+  const otherLastSeen = otherProfile
+    ? lastSeenOf(otherProfile.id) ?? otherProfile.last_seen
+    : ''
 
   useEffect(() => {
     if (!otherProfile) return
@@ -309,6 +354,19 @@ export function ChatWindow() {
     notifyTyping()
   }
 
+  function handleChatScroll(e: UIEvent<HTMLDivElement>) {
+    const el = e.currentTarget
+    stickToBottomRef.current =
+      el.scrollHeight - el.scrollTop - el.clientHeight < 96
+
+    if (!hasOlder || loadingOlder || el.scrollTop > 64) return
+
+    olderPinRef.current = { height: el.scrollHeight, top: el.scrollTop }
+    void loadOlder().then((result) => {
+      if (result === 'empty') olderPinRef.current = null
+    })
+  }
+
   function handlePickImage(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
@@ -321,8 +379,13 @@ export function ChatWindow() {
 
   return (
     <div className="flex h-[100dvh] max-w-[100vw] flex-col overflow-hidden text-[var(--text)]">
-      <div className="chat-scroll relative min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain">
-        <header className="header-shell safe-top sticky top-0 z-10 flex items-center gap-2.5 px-3 py-3 pr-16 sm:gap-3 sm:px-4 sm:pr-16">
+      <div
+        ref={scrollRef}
+        className="chat-scroll relative min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain"
+        onScroll={handleChatScroll}
+      >
+        <div className="sticky top-0 z-10">
+        <header className="header-shell safe-top flex flex-nowrap items-center gap-2 px-3 py-2.5 sm:gap-3 sm:px-4 sm:py-3">
           {otherProfile ? (
             <>
               <Avatar
@@ -338,12 +401,24 @@ export function ChatWindow() {
                 <OnlineStatus
                   isOnline={otherOnline}
                   isTyping={otherTyping}
-                  lastSeen={otherProfile.last_seen}
+                  lastSeen={otherLastSeen}
                   lang={profile.lang}
                 />
               </div>
-              <ThemeToggle lang={profile.lang} />
-              <InstallAppButton variant="compact" lang={profile.lang} />
+              <div className="flex shrink-0 items-center gap-0.5">
+                <ExportButton lang={profile.lang} />
+                <ThemeToggle lang={profile.lang} />
+                <InstallAppButton variant="compact" lang={profile.lang} />
+                <button
+                  type="button"
+                  onClick={() => setProfile(null)}
+                  title="Cambia profilo"
+                  aria-label="Cambia profilo"
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[var(--muted)] transition hover:bg-[var(--hover)] hover:text-[var(--text)]"
+                >
+                  <LogOut className="h-4 w-4" strokeWidth={2} />
+                </button>
+              </div>
             </>
           ) : (
             <div className="flex items-center gap-3">
@@ -352,6 +427,8 @@ export function ChatWindow() {
             </div>
           )}
         </header>
+        <ConnectionBanner lang={profile.lang} />
+        </div>
 
         <div className="space-y-3.5 px-3 py-5 pb-6 sm:px-4">
           {loadingMessages ? (
@@ -381,18 +458,33 @@ export function ChatWindow() {
               </p>
             </div>
           ) : (
-            messages.map((message) => (
-              <MessageBubble
-                key={message.id}
-                message={message}
-                profile={profile}
-                peerThemeColor={otherProfile?.theme_color ?? '#EC4899'}
-                isNew={newMessageIds.has(message.id)}
-                onRetry={handleRetry}
-                onEdit={handleStartEdit}
-                onDelete={(m) => void deleteMessage(m)}
-              />
-            ))
+            <>
+              {(hasOlder || loadingOlder) && (
+                <div className="flex justify-center pb-1">
+                  {loadingOlder ? (
+                    <div className="h-5 w-5 animate-spin rounded-full border-2 border-[var(--line)] border-t-sky-400" />
+                  ) : (
+                    <p className="text-[11px] text-[var(--muted)]">{t.loadOlder}</p>
+                  )}
+                </div>
+              )}
+              {messages.map((message) => (
+                <MessageBubble
+                  key={message.id}
+                  message={message}
+                  profile={profile}
+                  peerThemeColor={otherProfile?.theme_color ?? '#EC4899'}
+                  isNew={newMessageIds.has(message.id)}
+                  reactions={reactionsByMessage[message.id] ?? []}
+                  onRetry={handleRetry}
+                  onEdit={handleStartEdit}
+                  onDelete={(m) => void deleteMessage(m)}
+                  onToggleReaction={(emoji) =>
+                    void toggleReaction(message.id, profile.id, emoji)
+                  }
+                />
+              ))}
+            </>
           )}
           <div ref={bottomRef} />
         </div>

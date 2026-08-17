@@ -1,8 +1,3 @@
-/** VAPID public key (safe to expose in the browser) */
-export const VAPID_PUBLIC_KEY =
-  import.meta.env.VITE_VAPID_PUBLIC_KEY ||
-  'BPgdX6Q28x3PO0PXObHluwMRI_9plHhaKnNWvsiMH5IKEHXvX054oREqc2wOKlVflhir2XgYP1AkdIWPHh_Umls'
-
 const PROMPT_SHOWN_KEY = 'web_push_prompt_shown'
 
 export type PushSubscriptionJSON = {
@@ -53,6 +48,12 @@ async function getReadyRegistration(): Promise<ServiceWorkerRegistration | null>
  * Request permission and create a Web Push subscription bound to the PWA SW.
  */
 export async function enableWebPush(): Promise<PushSubscriptionJSON | null> {
+  const vapidPublicKey = import.meta.env.VITE_VAPID_PUBLIC_KEY
+  if (!vapidPublicKey) {
+    console.warn('VITE_VAPID_PUBLIC_KEY is not set; Web Push subscription skipped')
+    return null
+  }
+
   if (!isWebPushSupported()) {
     console.warn('Web Push not supported in this browser')
     return null
@@ -77,7 +78,7 @@ export async function enableWebPush(): Promise<PushSubscriptionJSON | null> {
 
   const subscription = await registration.pushManager.subscribe({
     userVisibleOnly: true,
-    applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY) as BufferSource,
+    applicationServerKey: urlBase64ToUint8Array(vapidPublicKey) as BufferSource,
   })
 
   return subscription.toJSON() as PushSubscriptionJSON

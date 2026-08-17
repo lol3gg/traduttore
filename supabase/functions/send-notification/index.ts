@@ -10,16 +10,6 @@ const corsHeaders = {
 
 const APP_URL_DEFAULT = 'https://traduttore-six.vercel.app'
 
-/** VAPID keys for native Web Push (private 2-person app) */
-const VAPID_PUBLIC_KEY =
-  Deno.env.get('VAPID_PUBLIC_KEY') ||
-  'BPgdX6Q28x3PO0PXObHluwMRI_9plHhaKnNWvsiMH5IKEHXvX054oREqc2wOKlVflhir2XgYP1AkdIWPHh_Umls'
-const VAPID_PRIVATE_KEY =
-  Deno.env.get('VAPID_PRIVATE_KEY') || 'FWUK7W0Urt5JORXS4VnptGEjT1qKR3rMJhYsD0c_o_E'
-const VAPID_SUBJECT = Deno.env.get('VAPID_SUBJECT') || 'mailto:nicolacarletti6@gmail.com'
-
-webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY)
-
 interface NotifyRequest {
   message_id: string
   recipient_id: string
@@ -80,11 +70,25 @@ Deno.serve(async (req: Request) => {
       })
     }
 
+    const vapidPublicKey = Deno.env.get('VAPID_PUBLIC_KEY')
+    const vapidPrivateKey = Deno.env.get('VAPID_PRIVATE_KEY')
+    const vapidSubject = Deno.env.get('VAPID_SUBJECT')
+
+    if (!vapidPublicKey || !vapidPrivateKey || !vapidSubject) {
+      console.error('VAPID keys not configured')
+      return new Response(JSON.stringify({ error: 'VAPID keys not configured' }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    webpush.setVapidDetails(vapidSubject, vapidPublicKey, vapidPrivateKey)
+
     const supabase = createClient(supabaseUrl, serviceRoleKey)
 
     const { data: recipient, error: recipientError } = await supabase
       .from('profiles')
-      .select('push_subscription, onesignal_player_id, is_online')
+      .select('push_subscription, is_online')
       .eq('id', recipient_id)
       .maybeSingle()
 
@@ -172,7 +176,7 @@ Deno.serve(async (req: Request) => {
       if (statusCode === 404 || statusCode === 410) {
         await supabase
           .from('profiles')
-          .update({ push_subscription: null, onesignal_player_id: null })
+          .update({ push_subscription: null })
           .eq('id', recipient_id)
       }
 

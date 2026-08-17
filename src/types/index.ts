@@ -8,7 +8,6 @@ export interface Profile {
   is_online: boolean
   is_typing: boolean
   last_seen: string
-  onesignal_player_id?: string | null
 }
 
 /** Client-only delivery status for optimistic UI */

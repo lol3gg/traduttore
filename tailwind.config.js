@@ -21,9 +21,9 @@ export default {
         lift: '0 22px 50px -28px rgba(0,0,0,0.7)',
       },
       keyframes: {
-        'slide-fade-in': {
-          '0%': { opacity: '0', transform: 'translateY(12px) scale(0.97)' },
-          '100%': { opacity: '1', transform: 'translateY(0) scale(1)' },
+        'slide-down': {
+          '0%': { opacity: '0', transform: 'translateY(-8px)' },
+          '100%': { opacity: '1', transform: 'translateY(0)' },
         },
         'fade-rise': {
           '0%': { opacity: '0', transform: 'translateY(20px)' },
@@ -54,6 +54,7 @@ export default {
       },
       animation: {
         'slide-fade-in': 'slide-fade-in 280ms cubic-bezier(0.22,1,0.36,1) both',
+        'slide-down': 'slide-down 220ms cubic-bezier(0.22,1,0.36,1) both',
         'fade-rise': 'fade-rise 620ms cubic-bezier(0.22,1,0.36,1) both',
         'bounce-dot': 'bounce-dot 1.2s infinite ease-in-out',
         'bounce-dot-delay-1': 'bounce-dot 1.2s infinite ease-in-out 150ms',

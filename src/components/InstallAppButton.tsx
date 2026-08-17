@@ -74,7 +74,7 @@ export function InstallAppButton({
         onClick={() => void handlePrimary()}
         title={t.title}
         aria-label={t.title}
-        className="flex h-9 w-9 items-center justify-center rounded-full text-[var(--muted)] transition hover:bg-[var(--hover)] hover:text-[var(--text)]"
+        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[var(--muted)] transition hover:bg-[var(--hover)] hover:text-[var(--text)]"
       >
         <Download className="h-4 w-4" strokeWidth={2} />
       </button>

@@ -18,12 +18,37 @@ interface ProfileContextValue {
 }
 
 const PROFILE_STORAGE_KEY = 'chat_profile_id'
+const PROFILE_CACHE_KEY = 'chatlook_profile'
+
+function readCachedProfile(): Profile | null {
+  try {
+    const raw = localStorage.getItem(PROFILE_CACHE_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as Profile
+    if (!parsed?.id || !parsed?.name) return null
+    return parsed
+  } catch {
+    return null
+  }
+}
+
+function writeCachedProfile(profile: Profile | null) {
+  try {
+    if (profile) localStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify(profile))
+    else localStorage.removeItem(PROFILE_CACHE_KEY)
+  } catch {
+    /* ignore */
+  }
+}
 
 const ProfileContext = createContext<ProfileContextValue | null>(null)
 
 export function ProfileProvider({ children }: { children: ReactNode }) {
-  const [profile, setProfileState] = useState<Profile | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [profile, setProfileState] = useState<Profile | null>(() => readCachedProfile())
+  const [loading, setLoading] = useState(() => {
+    if (readCachedProfile()) return false
+    return Boolean(localStorage.getItem(PROFILE_STORAGE_KEY))
+  })
 
   const savePushSubscription = useCallback(
     async (subscription: PushSubscriptionJSON) => {
@@ -34,8 +59,6 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
         .from('profiles')
         .update({
           push_subscription: subscription,
-          // Keep legacy column as endpoint marker for debugging
-          onesignal_player_id: subscription.endpoint.slice(-64),
         })
         .eq('id', profileId)
 
@@ -50,12 +73,14 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
     (next: Profile | null) => {
       if (next) {
         localStorage.setItem(PROFILE_STORAGE_KEY, next.id)
+        writeCachedProfile(next)
         // Refresh subscription when switching profile (permission already granted)
         void enableWebPush().then((sub) => {
           if (sub) void savePushSubscription(sub)
         })
       } else {
         localStorage.removeItem(PROFILE_STORAGE_KEY)
+        writeCachedProfile(null)
       }
       setProfileState(next)
     },
@@ -84,9 +109,11 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
 
         if (error || !data) {
           localStorage.removeItem(PROFILE_STORAGE_KEY)
+          writeCachedProfile(null)
           setProfileState(null)
         } else {
           setProfileState(data as Profile)
+          writeCachedProfile(data as Profile)
           if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
             void enableWebPush().then((sub) => {
               if (sub) void savePushSubscription(sub)
@@ -97,6 +124,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
         console.error('Failed to restore profile:', err)
         if (!cancelled) {
           localStorage.removeItem(PROFILE_STORAGE_KEY)
+          writeCachedProfile(null)
           setProfileState(null)
         }
       } finally {

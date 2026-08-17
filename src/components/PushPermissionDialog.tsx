@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
+import { translations } from '../i18n/translations'
+import type { Lang } from '../types'
 import {
   enableWebPush,
   hasShownPushPrompt,
@@ -8,14 +10,16 @@ import {
 } from '../lib/webPush'
 
 interface PushPermissionDialogProps {
+  lang: Lang
   onSubscribed?: (subscription: PushSubscriptionJSON) => void
 }
 
-export function PushPermissionDialog({ onSubscribed }: PushPermissionDialogProps) {
+export function PushPermissionDialog({ lang, onSubscribed }: PushPermissionDialogProps) {
   const [open, setOpen] = useState(false)
   const shownRef = useRef(false)
   const onSubscribedRef = useRef(onSubscribed)
   onSubscribedRef.current = onSubscribed
+  const t = translations[lang]
 
   useEffect(() => {
     if (!isWebPushSupported()) return
@@ -59,14 +63,13 @@ export function PushPermissionDialog({ onSubscribed }: PushPermissionDialogProps
           id="push-enable-title"
           className="font-display text-xl font-bold tracking-tight text-[var(--text)]"
         >
-          Attiva le notifiche
+          {t.pushDialogTitle}
         </h2>
         <p className="mt-2 text-sm leading-relaxed text-[var(--muted)]">
-          Ricevi un avviso quando arriva un messaggio anche se non sei nella chat.
+          {t.pushDialogBody}
         </p>
         <p className="mt-2 text-xs leading-relaxed text-slate-500">
-          Su iPhone: aggiungi prima il sito alla Home Screen (iOS 16.4+), poi riapri l&apos;app
-          dalla Home e attiva le notifiche.
+          {t.pushDialogIosHint}
         </p>
         <div className="mt-6 flex flex-col gap-2">
           <button
@@ -74,14 +77,14 @@ export function PushPermissionDialog({ onSubscribed }: PushPermissionDialogProps
             onClick={() => void handleEnable()}
             className="w-full rounded-[1.1rem] bg-gradient-to-r from-blue-500 to-sky-400 px-4 py-3.5 text-sm font-semibold text-white shadow-glow transition hover:brightness-110 active:scale-[0.99]"
           >
-            Attiva
+            {t.pushDialogEnable}
           </button>
           <button
             type="button"
             onClick={handleLater}
             className="w-full rounded-[1.1rem] px-4 py-2.5 text-sm text-[var(--muted)] transition hover:bg-[var(--hover)] hover:text-[var(--text)]"
           >
-            Più tardi
+            {t.pushDialogLater}
           </button>
         </div>
       </div>

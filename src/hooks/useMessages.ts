@@ -7,6 +7,53 @@ const MESSAGE_COLUMNS =
   'id, sender_id, original_text, original_lang, translated_text, translated_lang, image_url, created_at, read_at, edited_at, deleted_at'
 
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024
+const PAGE_SIZE = 40
+const MESSAGE_RETENTION_MS = 7 * 24 * 60 * 60 * 1000
+const PRUNE_INTERVAL_MS = 60_000
+const MIN_SEND_GAP_MS = 300
+
+let lastSendAt = 0
+
+function retentionCutoffIso(now = Date.now()) {
+  return new Date(now - MESSAGE_RETENTION_MS).toISOString()
+}
+
+function isRetained(message: Message, now = Date.now()) {
+  if (message.id.startsWith('temp-')) return true
+  const created = new Date(message.created_at).getTime()
+  if (Number.isNaN(created)) return true
+  return now - created < MESSAGE_RETENTION_MS
+}
+
+const MESSAGE_CACHE_KEY = 'chatlook_messages_cache'
+
+function readMessageCache(): Message[] {
+  try {
+    const raw = localStorage.getItem(MESSAGE_CACHE_KEY)
+    if (!raw) return []
+    const parsed = JSON.parse(raw) as Message[]
+    if (!Array.isArray(parsed)) return []
+    return parsed
+      .filter((m) => m && typeof m.id === 'string' && isRetained(m))
+      .map(asMessage)
+      .sort(sortMessages)
+      .slice(-PAGE_SIZE)
+  } catch {
+    return []
+  }
+}
+
+function writeMessageCache(messages: Message[]) {
+  try {
+    const toStore = messages
+      .filter((m) => !m.id.startsWith('temp-') && isRetained(m))
+      .slice(-PAGE_SIZE)
+      .map(({ local_image_preview: _preview, ...rest }) => rest)
+    localStorage.setItem(MESSAGE_CACHE_KEY, JSON.stringify(toStore))
+  } catch {
+    /* ignore quota */
+  }
+}
 
 function asMessage(row: Message): Message {
   return {
@@ -18,6 +65,25 @@ function asMessage(row: Message): Message {
   }
 }
 
+function sortMessages(a: Message, b: Message) {
+  const byTime = a.created_at.localeCompare(b.created_at)
+  return byTime !== 0 ? byTime : a.id.localeCompare(b.id)
+}
+
+function mergeMessages(prev: Message[], incoming: Message[]): Message[] {
+  const map = new Map<string, Message>()
+  for (const m of prev) map.set(m.id, m)
+  for (const m of incoming) {
+    const existing = map.get(m.id)
+    map.set(m.id, {
+      ...m,
+      delivery_status: existing?.delivery_status ?? m.delivery_status ?? 'sent',
+      local_image_preview: existing?.local_image_preview ?? m.local_image_preview,
+    })
+  }
+  return [...map.values()].sort(sortMessages)
+}
+
 function extensionFromMime(mime: string) {
   if (mime.includes('png')) return 'png'
   if (mime.includes('webp')) return 'webp'
@@ -27,12 +93,26 @@ function extensionFromMime(mime: string) {
 }
 
 const translatingIds = new Set<string>()
+const translatedIds = new Set<string>()
+
+function pathFromImageUrl(url: string | null | undefined): string | null {
+  if (!url) return null
+  const marker = '/chat-images/'
+  const index = url.indexOf(marker)
+  if (index === -1) return null
+  return decodeURIComponent(url.slice(index + marker.length).split('?')[0] || '') || null
+}
 
 export function useMessages(viewerId?: string | null) {
-  const [messages, setMessages] = useState<Message[]>([])
-  const [loadingMessages, setLoadingMessages] = useState(true)
+  const [messages, setMessages] = useState<Message[]>(readMessageCache)
+  const [loadingMessages, setLoadingMessages] = useState(() => readMessageCache().length === 0)
+  const [hasOlder, setHasOlder] = useState(false)
+  const [loadingOlder, setLoadingOlder] = useState(false)
   const viewerIdRef = useRef(viewerId)
   viewerIdRef.current = viewerId
+  const messagesRef = useRef<Message[]>([])
+  messagesRef.current = messages
+  const loadingOlderRef = useRef(false)
 
   const applyTranslationLocally = useCallback(
     (messageId: string, translatedText: string, translatedLang: Lang) => {
@@ -54,26 +134,18 @@ export function useMessages(viewerId?: string | null) {
   const requestTranslation = useCallback(
     (messageId: string, text: string, sourceLang: Lang) => {
       if (!text.trim() || messageId.startsWith('temp-')) return
-      if (translatingIds.has(messageId)) return
+      if (translatingIds.has(messageId) || translatedIds.has(messageId)) return
       translatingIds.add(messageId)
 
       const targetLang: Lang = sourceLang === 'it' ? 'ru' : 'it'
-      let finished = false
-
-      const finish = (translated: string, lang: Lang) => {
-        if (finished) {
-          applyTranslationLocally(messageId, translated, lang)
-          return
-        }
-        finished = true
-        translatingIds.delete(messageId)
-        applyTranslationLocally(messageId, translated, lang)
-      }
 
       // Browser MyMemory — fast, avoids edge IP rate limits
       void translateClient(text, sourceLang, targetLang).then(async (quick) => {
         if (!quick) return
-        finish(quick, targetLang)
+        if (translatedIds.has(messageId)) return
+        translatedIds.add(messageId)
+        translatingIds.delete(messageId)
+        applyTranslationLocally(messageId, quick, targetLang)
         await supabase
           .from('messages')
           .update({ translated_text: quick, translated_lang: targetLang })
@@ -93,7 +165,7 @@ export function useMessages(viewerId?: string | null) {
         .then(({ data, error }) => {
           if (error) {
             console.error('translate-message failed:', error.message)
-            if (!finished) translatingIds.delete(messageId)
+            if (!translatedIds.has(messageId)) translatingIds.delete(messageId)
             return
           }
           const payload = data as {
@@ -101,55 +173,109 @@ export function useMessages(viewerId?: string | null) {
             translated_lang?: Lang
           } | null
           if (payload?.translated_text) {
-            finish(
+            if (translatedIds.has(messageId)) return
+            translatedIds.add(messageId)
+            translatingIds.delete(messageId)
+            applyTranslationLocally(
+              messageId,
               payload.translated_text,
               payload.translated_lang ?? targetLang,
             )
-          } else if (!finished) {
+            void supabase
+              .from('messages')
+              .update({
+                translated_text: payload.translated_text,
+                translated_lang: payload.translated_lang ?? targetLang,
+              })
+              .eq('id', messageId)
+          } else if (!translatedIds.has(messageId)) {
             translatingIds.delete(messageId)
           }
         })
         .catch((err) => {
           console.error('translate-message failed:', err)
-          if (!finished) translatingIds.delete(messageId)
+          if (!translatedIds.has(messageId)) translatingIds.delete(messageId)
         })
     },
     [applyTranslationLocally],
   )
 
+  const refreshLatest = useCallback(async () => {
+    const { data, error } = await supabase
+      .from('messages')
+      .select(MESSAGE_COLUMNS)
+      .gt('created_at', retentionCutoffIso())
+      .order('created_at', { ascending: false })
+      .limit(PAGE_SIZE)
+
+    if (error) {
+      console.error('Failed to refresh messages:', error.message)
+      return
+    }
+    if (!data) return
+
+    const rows = (data as Message[]).map(asMessage).reverse()
+    setMessages((prev) => mergeMessages(prev, rows).filter((m) => isRetained(m)))
+
+    const me = viewerIdRef.current
+    for (const m of rows) {
+      if (m.deleted_at) continue
+      if (!m.original_text?.trim() || m.translated_text) continue
+      if (me && m.sender_id === me) continue
+      requestTranslation(m.id, m.original_text, m.original_lang)
+    }
+  }, [requestTranslation])
+
+  useEffect(() => {
+    writeMessageCache(messages)
+  }, [messages])
+
   useEffect(() => {
     let cancelled = false
 
-    async function fetchMessages(isRefresh = false) {
+    function translateMissing(rows: Message[]) {
+      const me = viewerIdRef.current
+      for (const m of rows) {
+        if (m.deleted_at) continue
+        if (!m.original_text?.trim() || m.translated_text) continue
+        if (me && m.sender_id === me) continue
+        requestTranslation(m.id, m.original_text, m.original_lang)
+      }
+    }
+
+    async function fetchLatestPage(isRefresh = false) {
       try {
         const { data, error } = await supabase
           .from('messages')
           .select(MESSAGE_COLUMNS)
-          .order('created_at', { ascending: true })
+          .gt('created_at', retentionCutoffIso())
+          .order('created_at', { ascending: false })
+          .limit(PAGE_SIZE)
 
         if (cancelled) return
 
         if (error) {
           console.error('Failed to load messages:', error.message)
-        } else if (data) {
-          const rows = (data as Message[]).map(asMessage)
-          setMessages(rows)
+          return
+        }
 
-          // Catch untranslated messages (e.g. after failed/slow prior invoke)
-          const me = viewerIdRef.current
-          for (const m of rows) {
-            if (m.deleted_at) continue
-            if (!m.original_text?.trim() || m.translated_text) continue
-            if (me && m.sender_id === me) continue
-            requestTranslation(m.id, m.original_text, m.original_lang)
-          }
+        const rows = (data as Message[]).map(asMessage).reverse()
+
+        if (isRefresh) {
+          setMessages((prev) => mergeMessages(prev, rows).filter((m) => isRetained(m)))
+          translateMissing(rows)
+        } else {
+          setHasOlder((data?.length ?? 0) >= PAGE_SIZE)
+          setMessages(rows)
+          translateMissing(rows)
         }
       } finally {
         if (!cancelled && !isRefresh) setLoadingMessages(false)
       }
     }
 
-    void fetchMessages(false)
+    void fetchLatestPage(messagesRef.current.length > 0)
+    void supabase.functions.invoke('purge-old-messages')
 
     const channel = supabase
       .channel('messages-realtime')
@@ -158,6 +284,7 @@ export function useMessages(viewerId?: string | null) {
         { event: 'INSERT', schema: 'public', table: 'messages' },
         (payload) => {
           const incoming = asMessage(payload.new as Message)
+          if (!isRetained(incoming)) return
           setMessages((prev) => {
             if (prev.some((m) => m.id === incoming.id)) {
               return prev.map((m) =>
@@ -176,7 +303,6 @@ export function useMessages(viewerId?: string | null) {
             return [...withoutOptimistic, incoming]
           })
 
-          // Recipient also kicks translation immediately (don't wait only on sender)
           const me = viewerIdRef.current
           if (
             incoming.original_text?.trim() &&
@@ -199,39 +325,119 @@ export function useMessages(viewerId?: string | null) {
           const updated = asMessage(payload.new as Message)
           setMessages((prev) => {
             const exists = prev.some((m) => m.id === updated.id)
-            if (!exists) return [...prev, updated]
-            return prev.map((m) =>
-              m.id === updated.id
-                ? { ...updated, delivery_status: m.delivery_status ?? 'sent' }
-                : m,
-            )
+            if (!exists) return prev
+            return prev.map((m) => {
+              if (m.id !== updated.id) return m
+              const keepFirstTranslation =
+                translatedIds.has(m.id) &&
+                Boolean(m.translated_text) &&
+                updated.original_text === m.original_text &&
+                !updated.deleted_at
+              return {
+                ...updated,
+                translated_text: keepFirstTranslation
+                  ? m.translated_text
+                  : updated.translated_text,
+                translated_lang: keepFirstTranslation
+                  ? m.translated_lang
+                  : updated.translated_lang,
+                delivery_status: m.delivery_status ?? 'sent',
+              }
+            })
           })
         },
       )
+      .on(
+        'postgres_changes',
+        { event: 'DELETE', schema: 'public', table: 'messages' },
+        (payload) => {
+          const id = (payload.old as { id?: string } | null)?.id
+          if (!id) return
+          setMessages((prev) => prev.filter((m) => m.id !== id))
+        },
+      )
       .subscribe((status) => {
-        if (status === 'SUBSCRIBED') {
-          void fetchMessages(true)
+        if (status === 'SUBSCRIBED' && messagesRef.current.length > 0) {
+          void refreshLatest()
         }
       })
 
     function refreshIfVisible() {
-      if (document.visibilityState === 'visible') {
-        void fetchMessages(true)
-      }
+      if (document.visibilityState !== 'visible') return
+      if (messagesRef.current.length === 0) return
+      void refreshLatest()
     }
 
     document.addEventListener('visibilitychange', refreshIfVisible)
     window.addEventListener('focus', refreshIfVisible)
     window.addEventListener('online', refreshIfVisible)
+    window.addEventListener('pageshow', refreshIfVisible)
 
     return () => {
       cancelled = true
       document.removeEventListener('visibilitychange', refreshIfVisible)
       window.removeEventListener('focus', refreshIfVisible)
       window.removeEventListener('online', refreshIfVisible)
+      window.removeEventListener('pageshow', refreshIfVisible)
       void supabase.removeChannel(channel)
     }
-  }, [requestTranslation])
+  }, [requestTranslation, refreshLatest])
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setMessages((prev) => {
+        const next = prev.filter((m) => isRetained(m))
+        return next.length === prev.length ? prev : next
+      })
+    }, PRUNE_INTERVAL_MS)
+    return () => window.clearInterval(timer)
+  }, [])
+
+  const loadOlder = useCallback(async () => {
+    if (loadingOlderRef.current || !hasOlder) return 'skipped' as const
+    const oldest = messagesRef.current.find((m) => !m.id.startsWith('temp-'))
+    if (!oldest) return 'empty' as const
+
+    loadingOlderRef.current = true
+    setLoadingOlder(true)
+
+    try {
+      const { data, error } = await supabase
+        .from('messages')
+        .select(MESSAGE_COLUMNS)
+        .gt('created_at', retentionCutoffIso())
+        .lt('created_at', oldest.created_at)
+        .order('created_at', { ascending: false })
+        .limit(PAGE_SIZE)
+
+      if (error) {
+        console.error('Failed to load older messages:', error.message)
+        return 'empty' as const
+      }
+
+      const rows = (data as Message[])
+        .map(asMessage)
+        .reverse()
+        .filter((m) => isRetained(m))
+      setHasOlder((data?.length ?? 0) >= PAGE_SIZE)
+      if (rows.length === 0) return 'empty' as const
+
+      setMessages((prev) => mergeMessages(prev, rows))
+
+      const me = viewerIdRef.current
+      for (const m of rows) {
+        if (m.deleted_at) continue
+        if (!m.original_text?.trim() || m.translated_text) continue
+        if (me && m.sender_id === me) continue
+        requestTranslation(m.id, m.original_text, m.original_lang)
+      }
+
+      return 'loaded' as const
+    } finally {
+      loadingOlderRef.current = false
+      setLoadingOlder(false)
+    }
+  }, [hasOlder, requestTranslation])
 
   const invokeSideEffects = useCallback(
     (
@@ -310,6 +516,10 @@ export function useMessages(viewerId?: string | null) {
       const trimmed = text.trim()
       if (!trimmed && !imageFile) return
 
+      const nowMs = Date.now()
+      if (nowMs - lastSendAt < MIN_SEND_GAP_MS) return
+      lastSendAt = nowMs
+
       let localPreview: string | null = null
       if (imageFile) {
         if (imageFile.size > MAX_IMAGE_BYTES) {
@@ -381,7 +591,11 @@ export function useMessages(viewerId?: string | null) {
         .single()
 
       if (error || !data) {
-        console.error('Failed to send message:', error?.message)
+        if (error?.message?.includes('Rate limit exceeded')) {
+          console.warn('Rate limit exceeded, please slow down')
+        } else {
+          console.error('Failed to send message:', error?.message)
+        }
         setMessages((prev) =>
           prev.map((m) =>
             m.id === tempId ? { ...m, delivery_status: 'failed' } : m,
@@ -444,6 +658,7 @@ export function useMessages(viewerId?: string | null) {
       }
 
       translatingIds.delete(message.id)
+      translatedIds.delete(message.id)
       requestTranslation(message.id, trimmed, message.original_lang)
     },
     [requestTranslation],
@@ -469,6 +684,22 @@ export function useMessages(viewerId?: string | null) {
           : m,
       ),
     )
+
+    if (message.image_url) {
+      const path = pathFromImageUrl(message.image_url)
+      if (path) {
+        try {
+          const { error: storageError } = await supabase.storage
+            .from('chat-images')
+            .remove([path])
+          if (storageError) {
+            console.error('Failed to delete chat image:', storageError.message)
+          }
+        } catch (err) {
+          console.error('Failed to delete chat image:', err)
+        }
+      }
+    }
 
     const { error } = await supabase
       .from('messages')
@@ -550,5 +781,9 @@ export function useMessages(viewerId?: string | null) {
     loadingMessages,
     markMessagesRead,
     unreadCount,
+    loadOlder,
+    hasOlder,
+    loadingOlder,
+    refreshLatest,
   }
 }

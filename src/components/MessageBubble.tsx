@@ -1,18 +1,22 @@
 import { useEffect, useRef, useState, type MouseEvent } from 'react'
-import { AlertCircle, Pencil, RotateCcw, Trash2, X } from 'lucide-react'
+import { AlertCircle, ImageIcon, Pencil, RotateCcw, Trash2, X } from 'lucide-react'
 import type { Message, Profile } from '../types'
 import { translations } from '../i18n/translations'
 import { themeGradient } from '../lib/color'
 import { MessageTicks } from './MessageTicks'
+import { ReactionPicker } from './ReactionPicker'
+import type { Reaction } from '../hooks/useReactions'
 
 interface MessageBubbleProps {
   message: Message
   profile: Profile
   peerThemeColor?: string
   isNew?: boolean
+  reactions?: Reaction[]
   onRetry?: (message: Message) => void
   onEdit?: (message: Message) => void
   onDelete?: (message: Message) => void
+  onToggleReaction?: (emoji: string) => void
 }
 
 const TRANSLATION_TIMEOUT_MS = 12_000
@@ -26,20 +30,32 @@ function formatTime(iso: string) {
   })
 }
 
+function groupReactionCounts(reactions: Reaction[]) {
+  const counts = new Map<string, number>()
+  for (const reaction of reactions) {
+    counts.set(reaction.emoji, (counts.get(reaction.emoji) ?? 0) + 1)
+  }
+  return [...counts.entries()].map(([emoji, count]) => ({ emoji, count }))
+}
+
 export function MessageBubble({
   message,
   profile,
   peerThemeColor = '#EC4899',
   isNew = false,
+  reactions = [],
   onRetry,
   onEdit,
   onDelete,
+  onToggleReaction,
 }: MessageBubbleProps) {
   const isMine = message.sender_id === profile.id
   const isFailed = message.delivery_status === 'failed'
   const isPending = message.delivery_status === 'pending'
   const isDeleted = Boolean(message.deleted_at)
-  const imageSrc = isDeleted ? null : message.local_image_preview || message.image_url
+  const localPreview = isDeleted ? null : message.local_image_preview || null
+  const remoteImage = isDeleted ? null : message.image_url
+  const hasImage = Boolean(localPreview || remoteImage)
   const hasText = Boolean(message.original_text?.trim())
   const displayText = isMine
     ? message.original_text
@@ -48,6 +64,7 @@ export function MessageBubble({
 
   const [translationTimedOut, setTranslationTimedOut] = useState(false)
   const [lightbox, setLightbox] = useState(false)
+  const [lightboxLoaded, setLightboxLoaded] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const pressTimer = useRef<number | null>(null)
@@ -70,9 +87,12 @@ export function MessageBubble({
 
   const bubbleColor = isMine ? profile.theme_color : peerThemeColor
   const gradient = !isFailed && !isDeleted ? themeGradient(bubbleColor) : null
-  const imageOnly = Boolean(imageSrc && !hasText)
+  const imageOnly = Boolean(hasImage && !hasText)
   const canAct = isMine && !isPending && !isDeleted && !message.id.startsWith('temp-')
   const canEdit = canAct && hasText
+  const canReact =
+    Boolean(onToggleReaction) && !isDeleted && !isPending && !message.id.startsWith('temp-')
+  const canOpenMenu = canReact || canAct || (isMine && isFailed)
 
   function clearPressTimer() {
     if (pressTimer.current) {
@@ -82,7 +102,7 @@ export function MessageBubble({
   }
 
   function openMenu() {
-    if (!canAct && !(isMine && isFailed)) return
+    if (!canOpenMenu) return
     didLongPress.current = true
     setConfirmDelete(false)
     setMenuOpen(true)
@@ -90,7 +110,7 @@ export function MessageBubble({
 
   function handlePointerDown() {
     didLongPress.current = false
-    if (!canAct && !(isMine && isFailed)) return
+    if (!canOpenMenu) return
     clearPressTimer()
     pressTimer.current = window.setTimeout(openMenu, LONG_PRESS_MS)
   }
@@ -133,7 +153,12 @@ export function MessageBubble({
         }`}
       >
         <div
-          className={`flex max-w-[86%] items-end gap-1.5 sm:max-w-[72%] ${
+          className={`flex max-w-[86%] flex-col sm:max-w-[72%] ${
+            isMine ? 'items-end' : 'items-start'
+          }`}
+        >
+        <div
+          className={`flex items-end gap-1.5 ${
             isMine ? 'flex-row' : 'flex-row-reverse'
           }`}
         >
@@ -181,7 +206,7 @@ export function MessageBubble({
                       : undefined
             }
             onContextMenu={(e) => {
-              if (!canAct && !(isMine && isFailed)) return
+              if (!canOpenMenu) return
               e.preventDefault()
               openMenu()
             }}
@@ -195,28 +220,54 @@ export function MessageBubble({
               <p className="text-[14px] italic text-[var(--muted)]">{t.deleted}</p>
             ) : (
               <>
-                {imageSrc && (
+                {hasImage && (
                   <button
                     type="button"
                     onClick={() => {
                       if (didLongPress.current) return
+                      setLightboxLoaded(Boolean(localPreview))
                       setLightbox(true)
                     }}
                     className="block w-full overflow-hidden rounded-[1.15rem] focus:outline-none"
                   >
-                    <img
-                      src={imageSrc}
-                      alt=""
-                      className="max-h-72 w-full object-cover"
-                      loading="lazy"
-                    />
+                    {localPreview ? (
+                      <img
+                        src={localPreview}
+                        alt=""
+                        className="max-h-72 w-full object-cover"
+                      />
+                    ) : (
+                      <span
+                        className={`flex min-h-[9.5rem] min-w-[11rem] flex-col items-center justify-center gap-1.5 px-6 py-8 ${
+                          isMine ? 'bg-black/25' : 'bg-[var(--hover)]'
+                        }`}
+                      >
+                        <ImageIcon
+                          className={`h-8 w-8 ${isMine ? 'text-white/85' : 'text-[var(--muted)]'}`}
+                        />
+                        <span
+                          className={`text-sm font-semibold ${
+                            isMine ? 'text-white' : 'text-[var(--text)]'
+                          }`}
+                        >
+                          {t.photo}
+                        </span>
+                        <span
+                          className={`text-[11px] font-medium ${
+                            isMine ? 'text-white/55' : 'text-[var(--muted)]'
+                          }`}
+                        >
+                          {t.tapToView}
+                        </span>
+                      </span>
+                    )}
                   </button>
                 )}
 
                 {hasText && (
                   <p
                     className={`whitespace-pre-wrap break-words text-[15px] font-medium leading-[1.45] tracking-[0.01em] ${
-                      imageSrc ? 'mt-2' : ''
+                      hasImage ? 'mt-2' : ''
                     } ${isMine ? 'text-white' : 'text-[var(--peer-text)]'}`}
                   >
                     {displayText}
@@ -225,13 +276,13 @@ export function MessageBubble({
 
                 {isTranslating && (
                   <p className="mt-1.5 bg-[linear-gradient(90deg,rgba(255,255,255,0.35),rgba(255,255,255,0.85),rgba(255,255,255,0.35))] bg-[length:200%_100%] bg-clip-text text-[11px] font-medium italic text-transparent animate-shimmer">
-                    traduzione in corso…
+                    {t.translating}
                   </p>
                 )}
                 {isFailed && (
                   <p className="mt-1.5 flex items-center gap-1 text-[11px] text-red-200">
                     <AlertCircle className="h-3 w-3" />
-                    Invio non riuscito
+                    {t.sendFailed}
                   </p>
                 )}
 
@@ -245,6 +296,24 @@ export function MessageBubble({
               </>
             )}
           </div>
+        </div>
+          {reactions.length > 0 && (
+            <div className={`mt-1 flex flex-wrap gap-1 ${isMine ? 'justify-end' : 'justify-start'}`}>
+              {groupReactionCounts(reactions).map(({ emoji, count }) => (
+                <button
+                  key={emoji}
+                  type="button"
+                  onClick={() => onToggleReaction?.(emoji)}
+                  className="inline-flex items-center gap-0.5 rounded-full bg-[var(--hover)] px-1.5 py-0.5 text-[13px] ring-1 ring-white/10"
+                >
+                  <span>{emoji}</span>
+                  {count > 1 && (
+                    <span className="text-[10px] font-semibold text-[var(--muted)]">{count}</span>
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
@@ -288,7 +357,16 @@ export function MessageBubble({
                 </div>
               </div>
             ) : (
-              <div className="py-2">
+              <div>
+                {canReact && (
+                  <ReactionPicker
+                    onPick={(emoji) => {
+                      setMenuOpen(false)
+                      onToggleReaction?.(emoji)
+                    }}
+                  />
+                )}
+                <div className="py-2">
                 {canEdit && (
                   <button
                     type="button"
@@ -302,6 +380,7 @@ export function MessageBubble({
                     {t.edit}
                   </button>
                 )}
+                {canAct && (
                 <button
                   type="button"
                   onClick={() => setConfirmDelete(true)}
@@ -310,6 +389,7 @@ export function MessageBubble({
                   <Trash2 className="h-4 w-4" />
                   {t.delete}
                 </button>
+                )}
                 <button
                   type="button"
                   onClick={() => setMenuOpen(false)}
@@ -317,13 +397,14 @@ export function MessageBubble({
                 >
                   {t.cancel}
                 </button>
+                </div>
               </div>
             )}
           </div>
         </div>
       )}
 
-      {lightbox && imageSrc && (
+      {lightbox && (localPreview || remoteImage) && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/92 p-3 backdrop-blur-md"
           onClick={() => setLightbox(false)}
@@ -338,11 +419,17 @@ export function MessageBubble({
           >
             <X className="h-5 w-5" />
           </button>
+          {!lightboxLoaded && (
+            <div className="absolute h-10 w-10 animate-spin rounded-full border-2 border-white/20 border-t-white" />
+          )}
           <img
-            src={imageSrc}
+            src={localPreview || remoteImage || ''}
             alt=""
-            className="max-h-[90dvh] max-w-full rounded-2xl object-contain shadow-lift"
+            className={`max-h-[90dvh] max-w-full rounded-2xl object-contain shadow-lift ${
+              lightboxLoaded ? 'opacity-100' : 'opacity-0'
+            }`}
             onClick={(e) => e.stopPropagation()}
+            onLoad={() => setLightboxLoaded(true)}
           />
         </div>
       )}
