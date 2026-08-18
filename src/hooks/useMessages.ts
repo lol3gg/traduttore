@@ -4,7 +4,7 @@ import { translateClient } from '../lib/translateClient'
 import type { Lang, Message } from '../types'
 
 const MESSAGE_COLUMNS =
-  'id, sender_id, original_text, original_lang, translated_text, translated_lang, image_url, created_at, read_at, edited_at, deleted_at'
+  'id, sender_id, original_text, original_lang, translated_text, translated_lang, image_url, created_at, read_at, edited_at, deleted_at, reply_to_id'
 
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024
 const PAGE_SIZE = 40
@@ -61,6 +61,7 @@ function asMessage(row: Message): Message {
     image_url: row.image_url ?? null,
     edited_at: row.edited_at ?? null,
     deleted_at: row.deleted_at ?? null,
+    reply_to_id: row.reply_to_id ?? null,
     delivery_status: row.delivery_status ?? 'sent',
   }
 }
@@ -512,6 +513,7 @@ export function useMessages(viewerId?: string | null) {
       recipientId: string,
       senderName: string,
       imageFile?: File | null,
+      replyToId?: string | null,
     ) => {
       const trimmed = text.trim()
       if (!trimmed && !imageFile) return
@@ -519,6 +521,9 @@ export function useMessages(viewerId?: string | null) {
       const nowMs = Date.now()
       if (nowMs - lastSendAt < MIN_SEND_GAP_MS) return
       lastSendAt = nowMs
+
+      const replyId =
+        replyToId && !replyToId.startsWith('temp-') ? replyToId : null
 
       let localPreview: string | null = null
       if (imageFile) {
@@ -542,6 +547,7 @@ export function useMessages(viewerId?: string | null) {
         read_at: null,
         edited_at: null,
         deleted_at: null,
+        reply_to_id: replyId,
         delivery_status: 'pending',
         local_image_preview: localPreview,
       }
@@ -586,6 +592,7 @@ export function useMessages(viewerId?: string | null) {
           translated_text: null,
           translated_lang: null,
           image_url: imageUrl,
+          reply_to_id: replyId,
         })
         .select(MESSAGE_COLUMNS)
         .single()
@@ -736,6 +743,7 @@ export function useMessages(viewerId?: string | null) {
           translated_text: null,
           translated_lang: null,
           image_url: failed.image_url,
+          reply_to_id: failed.reply_to_id,
         })
         .select(MESSAGE_COLUMNS)
         .single()

@@ -25,6 +25,7 @@ export interface Message {
   read_at: string | null
   edited_at: string | null
   deleted_at: string | null
+  reply_to_id: string | null
   /** Present only for optimistic / failed local rows */
   delivery_status?: MessageDeliveryStatus
   /** Local blob preview before upload finishes */

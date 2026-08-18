@@ -8,7 +8,7 @@ import {
   type KeyboardEvent,
   type UIEvent,
 } from 'react'
-import { Check, ImagePlus, LogOut, Send, X } from 'lucide-react'
+import { Camera, Check, ImagePlus, Images, LogOut, Send, X } from 'lucide-react'
 import { useProfile } from '../context/ProfileContext'
 import { useMessages } from '../hooks/useMessages'
 import { usePresence } from '../hooks/usePresence'
@@ -18,11 +18,11 @@ import { clearUnreadBadge, setUnreadBadge } from '../lib/appBadge'
 import { playSoftChime } from '../lib/softChime'
 import { supabase } from '../lib/supabase'
 import { translations } from '../i18n/translations'
+import { messageQuoteText } from '../lib/messageQuote'
 import type { Message, Profile } from '../types'
 import { Avatar } from './Avatar'
 import { MessageBubble } from './MessageBubble'
 import { ConnectionBanner } from './ConnectionBanner'
-import { ExportButton } from './ExportButton'
 import { InstallAppButton } from './InstallAppButton'
 import { OnlineStatus } from './OnlineStatus'
 import { ThemeToggle } from './ThemeToggle'
@@ -79,10 +79,15 @@ export function ChatWindow() {
   const [imagePreview, setImagePreview] = useState<string | null>(null)
   const [sending, setSending] = useState(false)
   const [editing, setEditing] = useState<Message | null>(null)
+  const [replyingTo, setReplyingTo] = useState<Message | null>(null)
+  const [highlightId, setHighlightId] = useState<string | null>(null)
+  const [photoSourceOpen, setPhotoSourceOpen] = useState(false)
   const [newMessageIds, setNewMessageIds] = useState<Set<string>>(() => new Set())
   const bottomRef = useRef<HTMLDivElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  const composerRef = useRef<HTMLTextAreaElement>(null)
+  const cameraInputRef = useRef<HTMLInputElement>(null)
+  const galleryInputRef = useRef<HTMLInputElement>(null)
   const seededIdsRef = useRef(false)
   const knownIdsRef = useRef<Set<string>>(new Set())
   const wasOtherOnlineRef = useRef(false)
@@ -291,7 +296,8 @@ export function ChatWindow() {
     if (imagePreview) URL.revokeObjectURL(imagePreview)
     setImageFile(null)
     setImagePreview(null)
-    if (fileInputRef.current) fileInputRef.current.value = ''
+    if (cameraInputRef.current) cameraInputRef.current.value = ''
+    if (galleryInputRef.current) galleryInputRef.current.value = ''
   }
 
   async function handleSend() {
@@ -316,7 +322,9 @@ export function ChatWindow() {
     const file = imageFile
     setText('')
     clearImage()
-    await sendMessage(value, profile.id, profile.lang, otherProfile.id, profile.name, file)
+    const replyId = replyingTo?.id ?? null
+    setReplyingTo(null)
+    await sendMessage(value, profile.id, profile.lang, otherProfile.id, profile.name, file, replyId)
     setSending(false)
   }
 
@@ -327,9 +335,31 @@ export function ChatWindow() {
 
   function handleStartEdit(message: Message) {
     if (!message.original_text?.trim()) return
+    setReplyingTo(null)
     setEditing(message)
     setText(message.original_text)
     clearImage()
+  }
+
+  function handleStartReply(message: Message) {
+    if (editing) {
+      setEditing(null)
+      setText('')
+    }
+    setReplyingTo(message)
+    window.setTimeout(() => composerRef.current?.focus(), 50)
+  }
+
+  function handleJumpToMessage(messageId: string) {
+    const el = scrollRef.current?.querySelector(
+      `[data-message-id="${CSS.escape(messageId)}"]`,
+    )
+    if (!(el instanceof HTMLElement)) return
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    setHighlightId(messageId)
+    window.setTimeout(() => {
+      setHighlightId((current) => (current === messageId ? null : current))
+    }, 1400)
   }
 
   function handleCancelEdit() {
@@ -370,11 +400,13 @@ export function ChatWindow() {
   function handlePickImage(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
-    if (!file.type.startsWith('image/')) return
+    if (file.type && !file.type.startsWith('image/')) return
 
     if (imagePreview) URL.revokeObjectURL(imagePreview)
     setImageFile(file)
     setImagePreview(URL.createObjectURL(file))
+    setPhotoSourceOpen(false)
+    e.target.value = ''
   }
 
   return (
@@ -406,7 +438,6 @@ export function ChatWindow() {
                 />
               </div>
               <div className="flex shrink-0 items-center gap-0.5">
-                <ExportButton lang={profile.lang} />
                 <ThemeToggle lang={profile.lang} />
                 <InstallAppButton variant="compact" lang={profile.lang} />
                 <button
@@ -468,7 +499,16 @@ export function ChatWindow() {
                   )}
                 </div>
               )}
-              {messages.map((message) => (
+              {messages.map((message) => {
+                const quoted = message.reply_to_id
+                  ? messages.find((item) => item.id === message.reply_to_id) ?? null
+                  : null
+                const quotedName = quoted
+                  ? quoted.sender_id === profile.id
+                    ? t.you
+                    : otherProfile?.name ?? ''
+                  : ''
+                return (
                 <MessageBubble
                   key={message.id}
                   message={message}
@@ -476,14 +516,20 @@ export function ChatWindow() {
                   peerThemeColor={otherProfile?.theme_color ?? '#EC4899'}
                   isNew={newMessageIds.has(message.id)}
                   reactions={reactionsByMessage[message.id] ?? []}
+                  replyTo={quoted}
+                  replyToName={quotedName}
+                  highlighted={highlightId === message.id}
                   onRetry={handleRetry}
                   onEdit={handleStartEdit}
+                  onReply={handleStartReply}
+                  onJumpToReply={handleJumpToMessage}
                   onDelete={(m) => void deleteMessage(m)}
                   onToggleReaction={(emoji) =>
                     void toggleReaction(message.id, profile.id, emoji)
                   }
                 />
-              ))}
+                )
+              })}
             </>
           )}
           <div ref={bottomRef} />
@@ -491,6 +537,37 @@ export function ChatWindow() {
       </div>
 
       <div className="composer-shell safe-bottom shrink-0">
+        {replyingTo && !editing && (
+          <div className="flex items-center gap-2 border-b border-white/8 px-4 py-2">
+            <div
+              className="min-w-0 flex-1 border-l-[3px] pl-2.5"
+              style={{
+                borderColor:
+                  replyingTo.sender_id === profile.id
+                    ? profile.theme_color
+                    : otherProfile?.theme_color ?? '#EC4899',
+              }}
+            >
+              <p className="truncate text-[11px] font-semibold text-sky-300">
+                {t.replyingTo}{' '}
+                {replyingTo.sender_id === profile.id
+                  ? t.you
+                  : otherProfile?.name ?? ''}
+              </p>
+              <p className="truncate text-xs text-[var(--muted)]">
+                {messageQuoteText(replyingTo, profile.id, t.photo, t.deleted)}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setReplyingTo(null)}
+              aria-label={t.cancel}
+              className="rounded-full p-1.5 text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)]"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        )}
         {editing && (
           <div className="flex items-center gap-2 border-b border-white/8 px-4 py-2">
             <div className="min-w-0 flex-1">
@@ -534,7 +611,14 @@ export function ChatWindow() {
           className="flex items-end gap-2 px-3 py-3.5 sm:px-4"
         >
           <input
-            ref={fileInputRef}
+            ref={galleryInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={handlePickImage}
+          />
+          <input
+            ref={cameraInputRef}
             type="file"
             accept="image/*"
             capture="environment"
@@ -545,7 +629,7 @@ export function ChatWindow() {
           {!editing && (
             <button
               type="button"
-              onClick={() => fileInputRef.current?.click()}
+              onClick={() => setPhotoSourceOpen(true)}
               aria-label={t.addPhoto}
               className="mb-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-[var(--muted)] transition hover:bg-[var(--hover)] hover:text-[var(--text)] active:scale-95"
             >
@@ -554,6 +638,7 @@ export function ChatWindow() {
           )}
 
           <textarea
+            ref={composerRef}
             value={text}
             onChange={handleChange}
             onKeyDown={handleKeyDown}
@@ -583,6 +668,50 @@ export function ChatWindow() {
           </button>
         </form>
       </div>
+
+      {photoSourceOpen && (
+        <div
+          className="fixed inset-0 z-[80] flex items-end justify-center bg-black/55 p-4 sm:items-center"
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setPhotoSourceOpen(false)}
+        >
+          <div
+            className="glass-strong w-full max-w-sm overflow-hidden rounded-[1.5rem]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              onClick={() => {
+                galleryInputRef.current?.click()
+                setPhotoSourceOpen(false)
+              }}
+              className="flex w-full items-center gap-3 px-4 py-3.5 text-left text-[var(--text)] transition hover:bg-[var(--hover)]"
+            >
+              <Images className="h-5 w-5 text-[var(--muted)]" strokeWidth={1.75} />
+              <span className="text-sm font-medium">{t.chooseFromGallery}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                cameraInputRef.current?.click()
+                setPhotoSourceOpen(false)
+              }}
+              className="flex w-full items-center gap-3 px-4 py-3.5 text-left text-[var(--text)] transition hover:bg-[var(--hover)]"
+            >
+              <Camera className="h-5 w-5 text-[var(--muted)]" strokeWidth={1.75} />
+              <span className="text-sm font-medium">{t.takePhoto}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setPhotoSourceOpen(false)}
+              className="w-full border-t border-white/8 px-4 py-3 text-sm text-[var(--muted)]"
+            >
+              {t.cancel}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

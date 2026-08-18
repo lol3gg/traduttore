@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState, type MouseEvent } from 'react'
-import { AlertCircle, ImageIcon, Pencil, RotateCcw, Trash2, X } from 'lucide-react'
+import { useEffect, useRef, useState, type MouseEvent, type PointerEvent } from 'react'
+import { AlertCircle, ImageIcon, Maximize2, Minimize2, Pencil, Reply, RotateCcw, Trash2, X } from 'lucide-react'
 import type { Message, Profile } from '../types'
 import { translations } from '../i18n/translations'
 import { themeGradient } from '../lib/color'
+import { messageQuoteText } from '../lib/messageQuote'
 import { MessageTicks } from './MessageTicks'
 import { ReactionPicker } from './ReactionPicker'
 import type { Reaction } from '../hooks/useReactions'
@@ -17,10 +18,56 @@ interface MessageBubbleProps {
   onEdit?: (message: Message) => void
   onDelete?: (message: Message) => void
   onToggleReaction?: (emoji: string) => void
+  onReply?: (message: Message) => void
+  onJumpToReply?: (messageId: string) => void
+  replyTo?: Message | null
+  replyToName?: string
+  highlighted?: boolean
 }
 
 const TRANSLATION_TIMEOUT_MS = 12_000
 const LONG_PRESS_MS = 420
+const SWIPE_TRIGGER = 56
+const SWIPE_MAX = 72
+
+type FullscreenCapable = HTMLElement & {
+  webkitRequestFullscreen?: () => Promise<void> | void
+}
+
+type FullscreenDocument = Document & {
+  webkitFullscreenElement?: Element | null
+  webkitExitFullscreen?: () => Promise<void> | void
+}
+
+function getFullscreenElement() {
+  const doc = document as FullscreenDocument
+  return document.fullscreenElement || doc.webkitFullscreenElement || null
+}
+
+async function enterFullscreen(el: HTMLElement) {
+  const node = el as FullscreenCapable
+  if (node.requestFullscreen) {
+    await node.requestFullscreen()
+    return true
+  }
+  if (node.webkitRequestFullscreen) {
+    await node.webkitRequestFullscreen()
+    return true
+  }
+  return false
+}
+
+async function exitFullscreen() {
+  const doc = document as FullscreenDocument
+  if (!getFullscreenElement()) return
+  if (document.exitFullscreen) {
+    await document.exitFullscreen()
+    return
+  }
+  if (doc.webkitExitFullscreen) {
+    await doc.webkitExitFullscreen()
+  }
+}
 
 function formatTime(iso: string) {
   return new Date(iso).toLocaleTimeString([], {
@@ -48,6 +95,11 @@ export function MessageBubble({
   onEdit,
   onDelete,
   onToggleReaction,
+  onReply,
+  onJumpToReply,
+  replyTo = null,
+  replyToName = '',
+  highlighted = false,
 }: MessageBubbleProps) {
   const isMine = message.sender_id === profile.id
   const isFailed = message.delivery_status === 'failed'
@@ -65,10 +117,36 @@ export function MessageBubble({
   const [translationTimedOut, setTranslationTimedOut] = useState(false)
   const [lightbox, setLightbox] = useState(false)
   const [lightboxLoaded, setLightboxLoaded] = useState(false)
+  const [isFullscreen, setIsFullscreen] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const pressTimer = useRef<number | null>(null)
   const didLongPress = useRef(false)
+  const didSwipe = useRef(false)
+  const lightboxRef = useRef<HTMLDivElement>(null)
+  const swipeStart = useRef<{ x: number; y: number } | null>(null)
+  const swipeAxis = useRef<'h' | 'v' | null>(null)
+  const swipeXRef = useRef(0)
+  const [swipeX, setSwipeX] = useState(0)
+  const [swiping, setSwiping] = useState(false)
+
+  useEffect(() => {
+    function syncFullscreen() {
+      setIsFullscreen(Boolean(getFullscreenElement()))
+    }
+    document.addEventListener('fullscreenchange', syncFullscreen)
+    document.addEventListener('webkitfullscreenchange', syncFullscreen)
+    return () => {
+      document.removeEventListener('fullscreenchange', syncFullscreen)
+      document.removeEventListener('webkitfullscreenchange', syncFullscreen)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (lightbox) return
+    setIsFullscreen(false)
+    void exitFullscreen()
+  }, [lightbox])
 
   useEffect(() => {
     if (isMine || message.translated_text || !hasText || isDeleted) {
@@ -87,12 +165,13 @@ export function MessageBubble({
 
   const bubbleColor = isMine ? profile.theme_color : peerThemeColor
   const gradient = !isFailed && !isDeleted ? themeGradient(bubbleColor) : null
-  const imageOnly = Boolean(hasImage && !hasText)
+  const imageOnly = Boolean(hasImage && !hasText && !replyTo && !message.reply_to_id)
   const canAct = isMine && !isPending && !isDeleted && !message.id.startsWith('temp-')
   const canEdit = canAct && hasText
   const canReact =
     Boolean(onToggleReaction) && !isDeleted && !isPending && !message.id.startsWith('temp-')
-  const canOpenMenu = canReact || canAct || (isMine && isFailed)
+  const canReply = Boolean(onReply) && !isPending && !message.id.startsWith('temp-')
+  const canOpenMenu = canReact || canAct || canReply || (isMine && isFailed)
 
   function clearPressTimer() {
     if (pressTimer.current) {
@@ -108,23 +187,102 @@ export function MessageBubble({
     setMenuOpen(true)
   }
 
-  function handlePointerDown() {
+  function handlePointerDown(e: PointerEvent<HTMLDivElement>) {
     didLongPress.current = false
-    if (!canOpenMenu) return
-    clearPressTimer()
-    pressTimer.current = window.setTimeout(openMenu, LONG_PRESS_MS)
+    didSwipe.current = false
+    swipeStart.current = { x: e.clientX, y: e.clientY }
+    swipeAxis.current = null
+    if (canOpenMenu) {
+      clearPressTimer()
+      pressTimer.current = window.setTimeout(openMenu, LONG_PRESS_MS)
+    }
+  }
+
+  function rubberSwipe(dx: number) {
+    const inward = isMine ? Math.min(0, dx) : Math.max(0, dx)
+    const abs = Math.abs(inward)
+    if (abs <= SWIPE_MAX) return inward
+    const extra = abs - SWIPE_MAX
+    const damped = SWIPE_MAX + extra * 0.18
+    return inward < 0 ? -damped : damped
+  }
+
+  function resetSwipe() {
+    setSwiping(false)
+    setSwipeX(0)
+    swipeXRef.current = 0
+    swipeStart.current = null
+    swipeAxis.current = null
+  }
+
+  function handlePointerMove(e: PointerEvent<HTMLDivElement>) {
+    if (!canReply || !swipeStart.current) return
+    const dx = e.clientX - swipeStart.current.x
+    const dy = e.clientY - swipeStart.current.y
+    if (!swipeAxis.current) {
+      if (Math.abs(dx) < 10 && Math.abs(dy) < 10) return
+      swipeAxis.current = Math.abs(dx) > Math.abs(dy) * 1.15 ? 'h' : 'v'
+      if (swipeAxis.current === 'h') {
+        clearPressTimer()
+        try {
+          e.currentTarget.setPointerCapture(e.pointerId)
+        } catch {
+          /* ignore */
+        }
+      }
+    }
+    if (swipeAxis.current !== 'h') return
+    const next = rubberSwipe(dx)
+    swipeXRef.current = next
+    setSwipeX(next)
+    setSwiping(true)
   }
 
   function handlePointerUp() {
     clearPressTimer()
+    if (!swipeStart.current) return
+    const shouldReply =
+      canReply && swipeAxis.current === 'h' && Math.abs(swipeXRef.current) >= SWIPE_TRIGGER
+    if (shouldReply) {
+      didSwipe.current = true
+      try {
+        navigator.vibrate?.(12)
+      } catch {
+        /* ignore */
+      }
+      onReply?.(message)
+    }
+    resetSwipe()
   }
 
   function handleClickCapture(e: MouseEvent) {
-    if (didLongPress.current) {
+    if (didLongPress.current || didSwipe.current) {
       e.preventDefault()
       e.stopPropagation()
       didLongPress.current = false
+      didSwipe.current = false
     }
+  }
+
+  async function toggleFullscreen() {
+    if (isFullscreen || getFullscreenElement()) {
+      await exitFullscreen()
+      setIsFullscreen(false)
+      return
+    }
+
+    setIsFullscreen(true)
+    try {
+      if (lightboxRef.current) await enterFullscreen(lightboxRef.current)
+    } catch {
+      /* CSS fullscreen still applies on browsers without the API */
+    }
+  }
+
+  function closeLightbox() {
+    setLightbox(false)
+    setIsFullscreen(false)
+    void exitFullscreen()
   }
 
   const meta = !isDeleted ? (
@@ -148,14 +306,41 @@ export function MessageBubble({
   return (
     <>
       <div
-        className={`flex ${isMine ? 'justify-end' : 'justify-start'} ${
+        data-message-id={message.id}
+        className={`relative flex ${isMine ? 'justify-end' : 'justify-start'} ${
           isNew ? 'animate-slide-fade-in' : ''
-        }`}
+        } ${highlighted ? 'rounded-2xl bg-white/[0.06] ring-1 ring-white/20' : ''}`}
+        style={{ touchAction: canReply ? 'pan-y' : undefined }}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerUp}
+        onLostPointerCapture={handlePointerUp}
+        onClickCapture={handleClickCapture}
       >
+        {canReply && (
+          <div
+            className={`pointer-events-none absolute inset-y-0 flex items-center ${
+              isMine ? 'right-1' : 'left-1'
+            }`}
+            style={{
+              opacity: Math.min(1, Math.abs(swipeX) / SWIPE_TRIGGER),
+              transform: `scale(${0.72 + 0.28 * Math.min(1, Math.abs(swipeX) / SWIPE_TRIGGER)})`,
+            }}
+          >
+            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white/12 text-[var(--text)]">
+              <Reply className="h-4 w-4" strokeWidth={2} />
+            </span>
+          </div>
+        )}
         <div
           className={`flex max-w-[86%] flex-col sm:max-w-[72%] ${
             isMine ? 'items-end' : 'items-start'
           }`}
+          style={{
+            transform: `translateX(${swipeX}px)`,
+            transition: swiping ? 'none' : 'transform 180ms ease-out',
+          }}
         >
         <div
           className={`flex items-end gap-1.5 ${
@@ -210,21 +395,63 @@ export function MessageBubble({
               e.preventDefault()
               openMenu()
             }}
-            onPointerDown={handlePointerDown}
-            onPointerUp={handlePointerUp}
-            onPointerCancel={handlePointerUp}
-            onPointerLeave={handlePointerUp}
-            onClickCapture={handleClickCapture}
           >
             {isDeleted ? (
               <p className="text-[14px] italic text-[var(--muted)]">{t.deleted}</p>
             ) : (
               <>
+                {(replyTo || message.reply_to_id) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (didLongPress.current || didSwipe.current) return
+                      if (replyTo) onJumpToReply?.(replyTo.id)
+                    }}
+                    className={`mb-1.5 w-full overflow-hidden rounded-xl text-left ${
+                      isMine ? 'bg-black/20' : 'bg-black/[0.06]'
+                    }`}
+                  >
+                    <div
+                      className="border-l-[3px] px-2.5 py-1.5"
+                      style={{
+                        borderColor: replyTo
+                          ? replyTo.sender_id === profile.id
+                            ? profile.theme_color
+                            : peerThemeColor
+                          : 'rgba(255,255,255,0.35)',
+                      }}
+                    >
+                      <p
+                        className="truncate text-[11px] font-semibold"
+                        style={{
+                          color: replyTo
+                            ? replyTo.sender_id === profile.id
+                              ? isMine
+                                ? 'rgba(255,255,255,0.9)'
+                                : profile.theme_color
+                              : peerThemeColor
+                            : undefined,
+                        }}
+                      >
+                        {replyTo ? replyToName : t.replyUnavailable}
+                      </p>
+                      <p
+                        className={`line-clamp-2 text-[12px] leading-snug ${
+                          isMine ? 'text-white/70' : 'text-[var(--muted)]'
+                        }`}
+                      >
+                        {replyTo
+                          ? messageQuoteText(replyTo, profile.id, t.photo, t.deleted)
+                          : t.replyUnavailable}
+                      </p>
+                    </div>
+                  </button>
+                )}
                 {hasImage && (
                   <button
                     type="button"
                     onClick={() => {
-                      if (didLongPress.current) return
+                      if (didLongPress.current || didSwipe.current) return
                       setLightboxLoaded(Boolean(localPreview))
                       setLightbox(true)
                     }}
@@ -367,6 +594,19 @@ export function MessageBubble({
                   />
                 )}
                 <div className="py-2">
+                {canReply && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMenuOpen(false)
+                      onReply?.(message)
+                    }}
+                    className="flex w-full items-center gap-3 px-5 py-3.5 text-left text-[15px] font-medium text-[var(--text)] transition hover:bg-[var(--hover)]"
+                  >
+                    <Reply className="h-4 w-4 text-sky-300" />
+                    {t.reply}
+                  </button>
+                )}
                 {canEdit && (
                   <button
                     type="button"
@@ -406,28 +646,50 @@ export function MessageBubble({
 
       {lightbox && (localPreview || remoteImage) && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/92 p-3 backdrop-blur-md"
-          onClick={() => setLightbox(false)}
+          ref={lightboxRef}
+          className={`fixed inset-0 z-[90] flex items-center justify-center bg-black backdrop-blur-md ${
+            isFullscreen ? 'p-0' : 'bg-black/92 p-3'
+          }`}
+          onClick={closeLightbox}
           role="dialog"
           aria-modal="true"
         >
-          <button
-            type="button"
-            aria-label="Chiudi"
-            className="absolute right-3 top-3 rounded-full bg-white/10 p-2.5 text-white ring-1 ring-white/10 transition hover:bg-white/15"
-            onClick={() => setLightbox(false)}
+          <div
+            className="absolute right-3 top-3 z-10 flex items-center gap-2"
+            onClick={(e) => e.stopPropagation()}
           >
-            <X className="h-5 w-5" />
-          </button>
+            <button
+              type="button"
+              aria-label={isFullscreen ? t.exitFullscreen : t.fullscreen}
+              className="rounded-full bg-white/10 p-2.5 text-white ring-1 ring-white/10 transition hover:bg-white/15"
+              onClick={() => void toggleFullscreen()}
+            >
+              {isFullscreen ? (
+                <Minimize2 className="h-5 w-5" />
+              ) : (
+                <Maximize2 className="h-5 w-5" />
+              )}
+            </button>
+            <button
+              type="button"
+              aria-label="Chiudi"
+              className="rounded-full bg-white/10 p-2.5 text-white ring-1 ring-white/10 transition hover:bg-white/15"
+              onClick={closeLightbox}
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
           {!lightboxLoaded && (
             <div className="absolute h-10 w-10 animate-spin rounded-full border-2 border-white/20 border-t-white" />
           )}
           <img
             src={localPreview || remoteImage || ''}
             alt=""
-            className={`max-h-[90dvh] max-w-full rounded-2xl object-contain shadow-lift ${
-              lightboxLoaded ? 'opacity-100' : 'opacity-0'
-            }`}
+            className={`object-contain shadow-lift ${
+              isFullscreen
+                ? 'h-full w-full max-h-none max-w-none rounded-none'
+                : 'max-h-[90dvh] max-w-full rounded-2xl'
+            } ${lightboxLoaded ? 'opacity-100' : 'opacity-0'}`}
             onClick={(e) => e.stopPropagation()}
             onLoad={() => setLightboxLoaded(true)}
           />
