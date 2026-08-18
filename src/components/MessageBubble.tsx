@@ -185,6 +185,8 @@ export function MessageBubble({
     didLongPress.current = true
     setConfirmDelete(false)
     setMenuOpen(true)
+    const active = document.activeElement
+    if (active instanceof HTMLElement) active.blur()
   }
 
   function handlePointerDown(e: PointerEvent<HTMLDivElement>) {
@@ -546,7 +548,7 @@ export function MessageBubble({
 
       {menuOpen && (
         <div
-          className="fixed inset-0 z-[80] flex items-end justify-center bg-black/55 p-4 sm:items-center"
+          className="fixed inset-0 z-[80] flex items-end justify-center bg-black/55 p-4 sheet-over-keyboard sm:items-center"
           role="dialog"
           aria-modal="true"
           onClick={() => {
@@ -555,7 +557,7 @@ export function MessageBubble({
           }}
         >
           <div
-            className="glass-strong w-full max-w-sm overflow-hidden rounded-[1.5rem]"
+            className="glass-strong w-full max-w-sm overflow-y-auto rounded-[1.5rem]"
             onClick={(e) => e.stopPropagation()}
           >
             {confirmDelete ? (

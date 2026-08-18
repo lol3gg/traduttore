@@ -14,6 +14,7 @@ import { useMessages } from '../hooks/useMessages'
 import { usePresence } from '../hooks/usePresence'
 import { useTyping } from '../hooks/useTyping'
 import { useReactions } from '../hooks/useReactions'
+import { useKeyboardInset } from '../hooks/useKeyboardInset'
 import { clearUnreadBadge, setUnreadBadge } from '../lib/appBadge'
 import { playSoftChime } from '../lib/softChime'
 import { supabase } from '../lib/supabase'
@@ -70,6 +71,7 @@ export function ChatWindow() {
     loadingOlder,
     refreshLatest,
   } = useMessages(profile?.id)
+  useKeyboardInset()
   const { isOnline, lastSeenOf } = usePresence(profile)
   const { typingStatus, notifyTyping, clearTypingFor } = useTyping(profile)
   const { reactionsByMessage, toggleReaction } = useReactions()
@@ -120,6 +122,17 @@ export function ChatWindow() {
       el.scrollTop = el.scrollHeight
     }
   }, [messages, loadingMessages, imagePreview])
+
+  useEffect(() => {
+    const viewport = window.visualViewport
+    function keepComposerVisible() {
+      if (!stickToBottomRef.current) return
+      const el = scrollRef.current
+      if (el) el.scrollTop = el.scrollHeight
+    }
+    viewport?.addEventListener('resize', keepComposerVisible)
+    return () => viewport?.removeEventListener('resize', keepComposerVisible)
+  }, [])
 
   // Soft chime + open from notification without reloading the app
   useEffect(() => {
@@ -347,7 +360,12 @@ export function ChatWindow() {
       setText('')
     }
     setReplyingTo(message)
-    window.setTimeout(() => composerRef.current?.focus(), 50)
+    stickToBottomRef.current = true
+    window.setTimeout(() => {
+      composerRef.current?.focus()
+      const el = scrollRef.current
+      if (el) el.scrollTop = el.scrollHeight
+    }, 50)
   }
 
   function handleJumpToMessage(messageId: string) {
@@ -410,7 +428,13 @@ export function ChatWindow() {
   }
 
   return (
-    <div className="flex h-[100dvh] max-w-[100vw] flex-col overflow-hidden text-[var(--text)]">
+    <div
+      className="box-border flex h-[100dvh] max-h-[100dvh] max-w-[100vw] flex-col overflow-hidden text-[var(--text)]"
+      style={{
+        paddingBottom:
+          'max(var(--keyboard-inset, 0px), env(keyboard-inset-bottom, 0px))',
+      }}
+    >
       <div
         ref={scrollRef}
         className="chat-scroll relative min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain"
@@ -671,7 +695,7 @@ export function ChatWindow() {
 
       {photoSourceOpen && (
         <div
-          className="fixed inset-0 z-[80] flex items-end justify-center bg-black/55 p-4 sm:items-center"
+          className="fixed inset-0 z-[80] flex items-end justify-center bg-black/55 p-4 sheet-over-keyboard sm:items-center"
           role="dialog"
           aria-modal="true"
           onClick={() => setPhotoSourceOpen(false)}
