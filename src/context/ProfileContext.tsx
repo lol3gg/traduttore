@@ -89,6 +89,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let cancelled = false
+    let pushTimer: number | undefined
 
     async function restoreProfile() {
       const savedId = localStorage.getItem(PROFILE_STORAGE_KEY)
@@ -107,7 +108,12 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
 
         if (cancelled) return
 
-        if (error || !data) {
+        if (error) {
+          console.warn('Failed to restore profile:', error.message)
+          return
+        }
+
+        if (!data) {
           localStorage.removeItem(PROFILE_STORAGE_KEY)
           writeCachedProfile(null)
           setProfileState(null)
@@ -115,18 +121,15 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
           setProfileState(data as Profile)
           writeCachedProfile(data as Profile)
           if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-            void enableWebPush().then((sub) => {
-              if (sub) void savePushSubscription(sub)
-            })
+            pushTimer = window.setTimeout(() => {
+              void enableWebPush().then((sub) => {
+                if (sub) void savePushSubscription(sub)
+              })
+            }, 2500)
           }
         }
       } catch (err) {
         console.error('Failed to restore profile:', err)
-        if (!cancelled) {
-          localStorage.removeItem(PROFILE_STORAGE_KEY)
-          writeCachedProfile(null)
-          setProfileState(null)
-        }
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -136,6 +139,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
 
     return () => {
       cancelled = true
+      if (pushTimer) window.clearTimeout(pushTimer)
     }
   }, [savePushSubscription])
 

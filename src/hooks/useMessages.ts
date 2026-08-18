@@ -114,6 +114,7 @@ export function useMessages(viewerId?: string | null) {
   const messagesRef = useRef<Message[]>([])
   messagesRef.current = messages
   const loadingOlderRef = useRef(false)
+  const lastFetchAtRef = useRef(0)
 
   const applyTranslationLocally = useCallback(
     (messageId: string, translatedText: string, translatedLang: Lang) => {
@@ -202,6 +203,7 @@ export function useMessages(viewerId?: string | null) {
   )
 
   const refreshLatest = useCallback(async () => {
+    lastFetchAtRef.current = Date.now()
     const { data, error } = await supabase
       .from('messages')
       .select(MESSAGE_COLUMNS)
@@ -245,6 +247,7 @@ export function useMessages(viewerId?: string | null) {
     }
 
     async function fetchLatestPage(isRefresh = false) {
+      lastFetchAtRef.current = Date.now()
       try {
         const { data, error } = await supabase
           .from('messages')
@@ -276,7 +279,9 @@ export function useMessages(viewerId?: string | null) {
     }
 
     void fetchLatestPage(messagesRef.current.length > 0)
-    void supabase.functions.invoke('purge-old-messages')
+    const purgeTimer = window.setTimeout(() => {
+      if (!cancelled) void supabase.functions.invoke('purge-old-messages')
+    }, 8000)
 
     const channel = supabase
       .channel('messages-realtime')
@@ -358,15 +363,24 @@ export function useMessages(viewerId?: string | null) {
         },
       )
       .subscribe((status) => {
-        if (status === 'SUBSCRIBED' && messagesRef.current.length > 0) {
+        if (
+          status === 'SUBSCRIBED' &&
+          messagesRef.current.length > 0 &&
+          Date.now() - lastFetchAtRef.current > 2500
+        ) {
           void refreshLatest()
         }
       })
 
+    let visTimer: number | undefined
     function refreshIfVisible() {
       if (document.visibilityState !== 'visible') return
       if (messagesRef.current.length === 0) return
-      void refreshLatest()
+      if (visTimer) window.clearTimeout(visTimer)
+      visTimer = window.setTimeout(() => {
+        if (Date.now() - lastFetchAtRef.current < 1500) return
+        void refreshLatest()
+      }, 280)
     }
 
     document.addEventListener('visibilitychange', refreshIfVisible)
@@ -376,6 +390,8 @@ export function useMessages(viewerId?: string | null) {
 
     return () => {
       cancelled = true
+      window.clearTimeout(purgeTimer)
+      if (visTimer) window.clearTimeout(visTimer)
       document.removeEventListener('visibilitychange', refreshIfVisible)
       window.removeEventListener('focus', refreshIfVisible)
       window.removeEventListener('online', refreshIfVisible)

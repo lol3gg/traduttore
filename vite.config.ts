@@ -64,15 +64,9 @@ export default defineConfig({
         clientsClaim: true,
         skipWaiting: true,
         importScripts: ['/push-handlers.js'],
-        // Do NOT precache HTML — stale shell + new hashed assets = blank app
-        globPatterns: ['**/*.{js,css,ico,png,svg,woff2}'],
-        navigateFallback: null,
+        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+        navigateFallback: 'index.html',
         runtimeCaching: [
-          {
-            // Always fetch fresh HTML so asset hashes match the deploy
-            urlPattern: ({ request }) => request.mode === 'navigate',
-            handler: 'NetworkOnly',
-          },
           {
             urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
             handler: 'CacheFirst',

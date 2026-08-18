@@ -55,6 +55,33 @@ function MessageSkeleton() {
   )
 }
 
+const OTHER_PROFILE_CACHE_KEY = 'chatlook_other_profile'
+
+function readCachedOtherProfile(selfId?: string | null): Profile | null {
+  if (!selfId) return null
+  try {
+    const raw = localStorage.getItem(OTHER_PROFILE_CACHE_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as Profile & { _viewer?: string }
+    if (!parsed?.id || parsed.id === selfId) return null
+    if (parsed._viewer && parsed._viewer !== selfId) return null
+    return parsed
+  } catch {
+    return null
+  }
+}
+
+function writeCachedOtherProfile(selfId: string, profile: Profile) {
+  try {
+    localStorage.setItem(
+      OTHER_PROFILE_CACHE_KEY,
+      JSON.stringify({ ...profile, _viewer: selfId }),
+    )
+  } catch {
+    /* ignore */
+  }
+}
+
 export function ChatWindow() {
   const { profile, setProfile } = useProfile()
   const {
@@ -75,7 +102,9 @@ export function ChatWindow() {
   const { isOnline, lastSeenOf } = usePresence(profile)
   const { typingStatus, notifyTyping, clearTypingFor } = useTyping(profile)
   const { reactionsByMessage, toggleReaction } = useReactions()
-  const [otherProfile, setOtherProfile] = useState<Profile | null>(null)
+  const [otherProfile, setOtherProfile] = useState<Profile | null>(() =>
+    readCachedOtherProfile(profile?.id),
+  )
   const [text, setText] = useState('')
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
@@ -243,6 +272,7 @@ export function ChatWindow() {
 
       if (cancelled || error || !data) return
       setOtherProfile(data as Profile)
+      writeCachedOtherProfile(profile!.id, data as Profile)
     }
 
     void fetchOther()
